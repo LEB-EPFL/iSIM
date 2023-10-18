@@ -1,10 +1,12 @@
 from pymmcore_widgets.mda._core_mda import MDAWidget
+from pymmcore_widgets._mda._general_mda_widgets import _MDAControlButtons
 from qtpy.QtWidgets import (QApplication, QPushButton, QWidget, QCheckBox, QSpinBox, QLabel,
                             QVBoxLayout)
 from qtpy.QtCore import Qt
 from pymmcore_plus import CMMCorePlus
 from superqt import QLabeledSlider
 from useq import MDASequence
+import pprint
 
 mmc = CMMCorePlus()
 mmc.loadSystemConfiguration()
@@ -27,12 +29,15 @@ class iSIMMDAWidget(MDAWidget):
         self.lasers.power_488.setValue(settings['ni']['laser_powers']['488'])
         self.lasers.power_561.setValue(settings['ni']['laser_powers']['561'])
 
-    def settings(self):
+    def get_settings(self):
         settings['acquisition'] = super().value()
         settings['ni']['laser_powers']['488'] = self.lasers.power_488.value()
         settings['ni']['laser_powers']['561'] = self.lasers.power_561.value()
         settings['twitchers'] = self.tab_wdg.isTabEnabled(self.tab_wdg.indexOf(self.twitchers))
         return settings
+
+    def _on_run_clicked(self) -> None:
+        pprint.pprint(self.get_settings())
 
 
 class LaserPowers(QWidget):
@@ -55,7 +60,7 @@ class LaserPowers(QWidget):
 class TwitcherSettings(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        # self.on_off = QCheckBox("Use Twitchers")
+
         text = """
         Twitchers will be run with the default settings for optimized performance
 
@@ -65,11 +70,7 @@ class TwitcherSettings(QWidget):
         self.label = QLabel(text)
         self.setLayout(QVBoxLayout())
         self.layout().addWidget(self.label)
-        # self.frequency_label = QLabel("Frequency")
-        # self.frequency = QSpinBox()
 
-        # self.amplitude_label = QLabel("Amplitude")
-        # self.amplitude = QSpinBox()
 
 
 
