@@ -5,7 +5,7 @@ from qtpy.QtCore import Qt
 from pymmcore_plus import CMMCorePlus
 from superqt import QLabeledSlider
 
-from mda import MDAWidget
+from mda import iSIMMDAWidget
 
 import pprint
 import copy
@@ -89,7 +89,7 @@ class MainWindow(QWidget):
         self.live_led.setChecked(True)
 
     def _mda(self):
-        self.mda_window = MDAWidget(mmcore=self.mmc)
+        self.mda_window = iSIMMDAWidget(mmcore=self.mmc, settings=self.settings)
         self.mda_window.show()
 
     def _488_activate(self, toggle):
@@ -146,11 +146,16 @@ class MainWindow(QWidget):
 
 
 if __name__ == "__main__":
-
+    from useq import MDASequence
     app = QApplication([])
+
+    seq = MDASequence(time_plan = {"interval": 0.2, "loops": 20},)
     settings = {}
+    settings['acquisition'] = seq.model_dump()
     settings['live'] = {"channel": "561", "fps": 5, "twitchers": False}
     settings['live']['ni'] = {"laser_powers": {'488': 50, '561': 50, 'led': 100}}
+    settings["ni"] = {"laser_powers": {"488": 20, "561": 50}}
+    settings['twitchers'] = True
     default_settings = copy.deepcopy(settings)
     frame = MainWindow(mmc, settings)
 

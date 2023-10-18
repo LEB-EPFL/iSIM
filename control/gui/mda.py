@@ -30,11 +30,11 @@ class iSIMMDAWidget(MDAWidget):
         self.lasers.power_561.setValue(settings['ni']['laser_powers']['561'])
 
     def get_settings(self):
-        settings['acquisition'] = super().value()
-        settings['ni']['laser_powers']['488'] = self.lasers.power_488.value()
-        settings['ni']['laser_powers']['561'] = self.lasers.power_561.value()
-        settings['twitchers'] = self.tab_wdg.isTabEnabled(self.tab_wdg.indexOf(self.twitchers))
-        return settings
+        self.settings['acquisition'] = super().value()
+        self.settings['ni']['laser_powers']['488'] = self.lasers.power_488.value()
+        self.settings['ni']['laser_powers']['561'] = self.lasers.power_561.value()
+        self.settings['twitchers'] = self.tab_wdg.isTabEnabled(self.tab_wdg.indexOf(self.twitchers))
+        return self.settings
 
     def _on_run_clicked(self) -> None:
         pprint.pprint(self.get_settings())
