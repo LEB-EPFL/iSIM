@@ -146,15 +146,10 @@ class MainWindow(QWidget):
 
 
 if __name__ == "__main__":
-    from useq import MDASequence
+    from control.settings import iSIMSettings
     app = QApplication([])
 
-    seq = MDASequence(time_plan = {"interval": 0.2, "loops": 20},)
-    settings = {}
-    settings['acquisition'] = seq.model_dump()
-    settings['live'] = {"channel": "561", "fps": 5, "twitchers": False}
-    settings['live']['ni'] = {"laser_powers": {'488': 50, '561': 50, 'led': 100}}
-    settings["ni"] = {"laser_powers": {"488": 20, "561": 50}}
+    settings = iSIMSettings(time_plan = {"interval": 0.2, "loops": 20},)
     settings['twitchers'] = True
     default_settings = copy.deepcopy(settings)
     frame = MainWindow(mmc, settings)

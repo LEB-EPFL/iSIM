@@ -7,7 +7,7 @@ import time
 import copy
 
 from useq import MDAEvent
-from control.ni.sequences import NIDeviceGroup
+from control.ni.devices import NIDeviceGroup
 
 class AcquisitionEngine(MDAEngine):
     def __init__(self, mmc: CMMCorePlus, device_group: NIDeviceGroup = None,

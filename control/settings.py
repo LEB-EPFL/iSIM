@@ -12,6 +12,7 @@ class iSIMSettings(dict):
         laser_powers: dict = {'488': 15, '561': 80},
         use_filters: bool = False,
         relative_z: float = 0.0,
+        twitchers: bool = False,
         axis_order: str = "tpgcz",
         time_plan: dict = None,
         channels: (dict) = ({"config": "488", "exposure": 100}, ),
@@ -24,6 +25,7 @@ class iSIMSettings(dict):
         super().__init__()
         self['use_filters'] = use_filters
         self['relative_z'] = relative_z
+        self['twitchers'] = twitchers
         self['acquisition'] = {}
         self['acquisition']['axis_order'] = axis_order
         self['acquisition']['channels'] = channels
@@ -39,6 +41,11 @@ class iSIMSettings(dict):
         self['ni'] = {}
         self['ni']['laser_powers'] = laser_powers
         self['ni']['sample_rate'] = ni_sample_rate
+
+        self['live'] = {"channel": "561", "fps": 5, "twitchers": False}
+        self['live']['ni'] = {"laser_powers": {'488': 50, '561': 50, 'led': 100}}
+
+        self['live_mode'] = False
 
         self.calculate_ni_settings()
         self.set_defaults_grid_plan()
@@ -63,7 +70,7 @@ class iSIMSettings(dict):
 
 
 if __name__ == "__main__":
-    from ni.sequences import NIDeviceGroup
+    from ni.devices import NIDeviceGroup
     from settings_translate import useq_from_settings, add_settings_from_core
     from pymmcore_plus import CMMCorePlus
     from pymmcore_widgets import ImagePreview
@@ -106,9 +113,9 @@ if __name__ == "__main__":
     mmc.run_mda(seq)
     app.exec_()
 
-    import matplotlib.pyplot as plt
-    data = devices.get_data(next(seq.iter_events()))
-    for device in data:
-        plt.step(np.arange(len(device))/acq['ni']['sample_rate'], device)
-    plt.legend(np.arange(data.shape[0]))
-    plt.show()
+    # import matplotlib.pyplot as plt
+    # data = devices.get_data(next(seq.iter_events()))
+    # for device in data:
+    #     plt.step(np.arange(len(device))/acq['ni']['sample_rate'], device)
+    # plt.legend(np.arange(data.shape[0]))
+    # plt.show()

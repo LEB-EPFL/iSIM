@@ -3,6 +3,26 @@ import numpy as np
 from scipy import ndimage
 import useq
 
+class NIDeviceGroup():
+    def __init__(self, settings: dict):
+
+        self.galvo = Galvo()
+        self.camera = Camera()
+        self.aotf = AOTF()
+        self.twitcher = Twitcher()
+        self.stage = Stage()
+        self.led = LED()
+        self.settings = settings
+
+    def get_data(self, event: useq.MDAEvent, next_event: useq.MDAEvent|None = None):
+        galvo = self.galvo.one_frame(self.settings)[:-self.settings['readout_points']//3]
+        stage = self.stage.one_frame(self.settings, event, next_event)[:-self.settings['readout_points']//3]
+        camera = self.camera.one_frame(self.settings)[:-self.settings['readout_points']//3]
+        aotf = self.aotf.one_frame(self.settings, event)[:, :-self.settings['readout_points']//3]
+        led = self.led.one_frame(self.settings, event)[:, :-self.settings['readout_points']//3]
+        twitcher = self.twitcher.one_frame(self.settings)[:-self.settings['readout_points']//3]
+        return np.vstack([galvo, stage, camera, aotf, led, twitcher])
+
 
 def makePulse(start, end, offset, n_points):
     DutyCycle=10/n_points

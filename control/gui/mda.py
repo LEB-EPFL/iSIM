@@ -1,12 +1,10 @@
 from pymmcore_widgets.mda._core_mda import MDAWidget
-from pymmcore_widgets._mda._general_mda_widgets import _MDAControlButtons
-from qtpy.QtWidgets import (QApplication, QPushButton, QWidget, QCheckBox, QSpinBox, QLabel,
-                            QVBoxLayout)
+from qtpy.QtWidgets import (QApplication, QWidget, QLabel, QVBoxLayout)
 from qtpy.QtCore import Qt
 from pymmcore_plus import CMMCorePlus
 from superqt import QLabeledSlider
-from useq import MDASequence
 import pprint
+from control.settings_translate import useq_from_settings
 
 mmc = CMMCorePlus()
 mmc.loadSystemConfiguration()
@@ -21,16 +19,17 @@ class iSIMMDAWidget(MDAWidget):
         self.tab_wdg.channels.layout().addWidget(self.lasers)
         self.tab_wdg.addTab(self.twitchers, "Twitchers", checked=settings['twitchers'])
         self.tab_wdg.setCurrentIndex(self.tab_wdg.indexOf(self.tab_wdg.channels))
+        super().setValue(useq_from_settings(settings))
 
     def setValue(self, settings: dict):
-        seq = MDASequence(**settings['acquisition'])
+        seq = useq_from_settings(settings)
         super().setValue(seq)
         self.tab_wdg.setTabEnabled(self.tab_wdg.indexOf(self.twitchers), settings['twitchers'])
         self.lasers.power_488.setValue(settings['ni']['laser_powers']['488'])
         self.lasers.power_561.setValue(settings['ni']['laser_powers']['561'])
 
     def get_settings(self):
-        self.settings['acquisition'] = super().value()
+        self.settings['acquisition'] = super().value().model_dump()
         self.settings['ni']['laser_powers']['488'] = self.lasers.power_488.value()
         self.settings['ni']['laser_powers']['561'] = self.lasers.power_561.value()
         self.settings['twitchers'] = self.tab_wdg.isTabEnabled(self.tab_wdg.indexOf(self.twitchers))
