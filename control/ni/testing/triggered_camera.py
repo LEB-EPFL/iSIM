@@ -32,7 +32,7 @@ class iSIMEngine(MDAEngine):
     def __init__(self, mmc):
         super().__init__(mmc)
 
-        self.pre_trigger_delay = 7 #ms
+        self.pre_trigger_delay = 10 #ms
 
         self.mmc = mmc
 
@@ -41,7 +41,7 @@ class iSIMEngine(MDAEngine):
         self.task.ao_channels.add_ao_voltage_chan('Dev1/ao2')
         self.task2 = nidaqmx.Task()
         self.task2.ao_channels.add_ao_voltage_chan('Dev1/ao6')
-        self.task.timing.cfg_samp_clk_timing(rate=9600, sample_mode=nidaqmx.constants.AcquisitionType.CONTINUOUS)
+        self.task.timing.cfg_samp_clk_timing(rate=48000, sample_mode=nidaqmx.constants.AcquisitionType.CONTINUOUS)
         self.task.start()
         self.task2.start()
         self.frame_times = np.zeros(20)

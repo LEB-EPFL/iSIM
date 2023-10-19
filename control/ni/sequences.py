@@ -3,28 +3,28 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 
-from devices import AOTF, Camera, Galvo, Twitcher, Stage
-from control.ni.core_settings import NISettings
+from control.ni.devices import AOTF, Camera, Galvo, Twitcher, Stage, LED
+from settings import iSIMSettings
 
-class ISIMFrame():
-    def __init__(self, settings:NISettings):
+class NIDeviceGroup():
+    def __init__(self, settings: dict):
 
         self.galvo = Galvo()
         self.camera = Camera()
         self.aotf = AOTF()
         self.twitcher = Twitcher()
         self.stage = Stage()
-
+        self.led = LED()
         self.settings = settings
-        self.settings.get_settings()
 
     def get_data(self, event: useq.MDAEvent, next_event: useq.MDAEvent|None = None):
-        galvo = self.galvo.one_frame(self.settings)
-        stage = self.stage.one_frame(self.settings, event, next_event)
-        camera = self.camera.one_frame(self.settings)
-        aotf = self.aotf.one_frame(event, self.settings)
-        twitcher = self.twitcher.one_frame(self.settings)
-        return np.vstack([galvo, stage, camera, aotf, twitcher])
+        galvo = self.galvo.one_frame(self.settings)[:-self.settings['readout_points']//3]
+        stage = self.stage.one_frame(self.settings, event, next_event)[:-self.settings['readout_points']//3]
+        camera = self.camera.one_frame(self.settings)[:-self.settings['readout_points']//3]
+        aotf = self.aotf.one_frame(self.settings, event)[:, :-self.settings['readout_points']//3]
+        led = self.led.one_frame(self.settings, event)[:, :-self.settings['readout_points']//3]
+        twitcher = self.twitcher.one_frame(self.settings)[:-self.settings['readout_points']//3]
+        return np.vstack([galvo, stage, camera, aotf, led, twitcher])
 
     def plot(self):
         event = useq.MDAEvent(channel={"config": "488"}, z_pos=2)
@@ -44,10 +44,10 @@ if __name__ == "__main__":
     mmc.setCameraDevice("Prime")
     mmc.setExposure(100)
     mmc.setProperty("Prime", "TriggerMode", "Edge Trigger")
-    settings = NISettings(mmc)
+    settings = iSIMSettings()
     event = useq.MDAEvent(channel={"config": "488"}, metadata={'power':50})
     event = useq.MDAEvent(channel={"config": "488"}, z_pos=2)
     event2 = useq.MDAEvent(channel={"config": "488"}, z_pos=5)
-    frame = ISIMFrame(settings)
+    frame = iSIMSettings(settings)
     data = frame.get_data(event)
     frame.plot()

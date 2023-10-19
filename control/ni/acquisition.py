@@ -7,16 +7,17 @@ import time
 import copy
 
 from useq import MDAEvent
-from sequences import ISIMFrame
-from core_settings import NISettings
+from control.ni.sequences import NIDeviceGroup
 
 class AcquisitionEngine(MDAEngine):
-    def __init__(self, mmc):
+    def __init__(self, mmc: CMMCorePlus, device_group: NIDeviceGroup = None,
+                 settings: dict = None):
         super().__init__(mmc)
 
-        self.pre_trigger_delay = 7 #ms
-        self.sample_rate = 9600
+        self.pre_trigger_delay = 10 #ms
         self.mmc = mmc
+        self.settings = settings
+        self.device_group = device_group
 
         self.task = nidaqmx.Task()
         self.task.ao_channels.add_ao_voltage_chan('Dev1/ao0') # galvo channel
@@ -25,30 +26,34 @@ class AcquisitionEngine(MDAEngine):
         self.task.ao_channels.add_ao_voltage_chan('Dev1/ao3') # aotf blanking channel
         self.task.ao_channels.add_ao_voltage_chan('Dev1/ao4') # aotf 488 channel
         self.task.ao_channels.add_ao_voltage_chan('Dev1/ao5') # aotf 561 channel
+        self.task.ao_channels.add_ao_voltage_chan('Dev1/ao6') # LED channel
         self.task.ao_channels.add_ao_voltage_chan('Dev1/ao7') # twitcher channel
-        self.task.timing.cfg_samp_clk_timing(rate=self.sample_rate,
-                                             sample_mode=nidaqmx.constants.AcquisitionType.CONTINUOUS)
+        self.task.timing.cfg_samp_clk_timing(rate=settings['ni']['sample_rate'],
+                                                sample_mode=nidaqmx.constants.AcquisitionType.CONTINUOUS)
 
         self.mmc.mda.events.sequenceFinished.connect(self.on_sequence_end)
 
-        self.settings = NISettings(mmc, self.sample_rate)
-        self.frame = ISIMFrame(self.settings)
         self.snap_lock = Lock()
 
-    def setup_event(self, event):
+    def setup_event(self, event: MDAEvent):
         try:
             next_event = next(self.internal_event_iterator) or None
         except StopIteration:
             next_event = None
-        self.ni_data = self.frame.get_data(event, next_event)
-        self.snap_lock.acquire()
+        self.ni_data = self.device_group.get_data(event, next_event)
         thread = Thread(target=self.snap_and_get, args=(event,))
+        self.snap_lock.acquire()
         thread.start()
 
-    def exec_event(self, event):
+    def exec_event(self, event: MDAEvent):
         self.snap_lock.acquire()
         time.sleep(self.pre_trigger_delay/1000)
-        self.task.write(self.ni_data)
+        # print("ni_data shape", self.ni_data.shape)
+        try:
+            self.task.write(self.ni_data)
+        except Exception as e:
+            print(e)
+            print("FAILED TO WRITE NI DATA")
         return ()
 
     def snap_and_get(self, event):
@@ -70,6 +75,7 @@ class AcquisitionEngine(MDAEngine):
         self.internal_event_iterator = self.sequence.iter_events()
         next(self.internal_event_iterator)
         self.task.start()
+        self.task.write(np.zeros(self.task.number_of_channels))
 
 
 if __name__ == "__main__":
