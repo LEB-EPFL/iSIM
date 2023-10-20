@@ -4,7 +4,7 @@ from scipy import ndimage
 import useq
 
 class NIDeviceGroup():
-    def __init__(self, settings: dict):
+    def __init__(self, settings: dict = None):
 
         self.galvo = Galvo()
         self.camera = Camera()
@@ -12,7 +12,7 @@ class NIDeviceGroup():
         self.twitcher = Twitcher()
         self.stage = Stage()
         self.led = LED()
-        self.settings = settings
+        self.settings = settings or {}
 
     def get_data(self, event: useq.MDAEvent, next_event: useq.MDAEvent|None = None):
         galvo = self.galvo.one_frame(self.settings)[:-self.settings['readout_points']//3]
@@ -22,6 +22,9 @@ class NIDeviceGroup():
         led = self.led.one_frame(self.settings, event)[:, :-self.settings['readout_points']//3]
         twitcher = self.twitcher.one_frame(self.settings)[:-self.settings['readout_points']//3]
         return np.vstack([galvo, stage, camera, aotf, led, twitcher])
+
+    def update_settings(self, settings: dict):
+        self.settings = settings
 
 
 def makePulse(start, end, offset, n_points):

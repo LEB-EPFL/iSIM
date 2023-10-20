@@ -1,10 +1,11 @@
 import numpy as np
-
+from functools import reduce
+import operator
 
 class iSIMSettings(dict):
     """Central dict that holds all data necessary to run the iSIM.
 
-    Different components can request views into the dict that are necessart for them to function.
+    Different components can request views into the dict that are necessary for them to function.
     It includes information for the NIDAQ, pymmcore-plus etc.
     """
     def __init__(
@@ -67,6 +68,13 @@ class iSIMSettings(dict):
                                                     self['ni']['sample_rate']))
         self['ni']['total_points'] = self['ni']['exposure_points'] + self['ni']['readout_points']
 
+    def get_by_path(self, items):
+        """Access a nested object by item sequence."""
+        return reduce(operator.getitem, items, self)
+
+    def set_by_path(self, items, value):
+        """Set a value in a nested object by item sequence."""
+        self.get_by_path(items[:-1])[items[-1]] = value
 
 
 if __name__ == "__main__":

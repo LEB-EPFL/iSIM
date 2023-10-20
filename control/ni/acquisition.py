@@ -28,8 +28,6 @@ class AcquisitionEngine(MDAEngine):
         self.task.ao_channels.add_ao_voltage_chan('Dev1/ao5') # aotf 561 channel
         self.task.ao_channels.add_ao_voltage_chan('Dev1/ao6') # LED channel
         self.task.ao_channels.add_ao_voltage_chan('Dev1/ao7') # twitcher channel
-        self.task.timing.cfg_samp_clk_timing(rate=settings['ni']['sample_rate'],
-                                                sample_mode=nidaqmx.constants.AcquisitionType.CONTINUOUS)
 
         self.mmc.mda.events.sequenceFinished.connect(self.on_sequence_end)
 
@@ -77,6 +75,11 @@ class AcquisitionEngine(MDAEngine):
         self.task.start()
         self.task.write(np.zeros(self.task.number_of_channels))
 
+    def update_settings(self, settings):
+        self.settings = settings
+        self.task.timing.cfg_samp_clk_timing(rate=settings['ni']['sample_rate'],
+                                                sample_mode=nidaqmx.constants.AcquisitionType.CONTINUOUS)
+        print(settings)
 
 if __name__ == "__main__":
     import useq
