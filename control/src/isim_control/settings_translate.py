@@ -1,4 +1,4 @@
-from control.settings import iSIMSettings
+from isim_control.settings import iSIMSettings
 from pymmcore_plus import CMMCorePlus
 from useq import MDASequence
 

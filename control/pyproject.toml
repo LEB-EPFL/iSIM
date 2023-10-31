@@ -1,0 +1,10 @@
+[project]
+name = "isim_control"
+description = "Control for the iSIM microscope at LEB"
+version = "0.0.2"
+authors = [
+    { name = "Willi Stepp", email = "willi.stepp@epfl.ch" }
+]
+
+[tool.coverage.run]
+source = ['isim_control']

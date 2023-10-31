@@ -1,10 +1,11 @@
 from pymmcore_widgets.mda._core_mda import MDAWidget
-from qtpy.QtWidgets import (QApplication, QWidget, QLabel, QVBoxLayout)
+from qtpy.QtWidgets import (QApplication, QWidget, QLabel, QVBoxLayout, QCheckBox, QSizePolicy,
+                            QGridLayout)
 from qtpy.QtCore import Qt
 from pymmcore_plus import CMMCorePlus
 from superqt import QLabeledSlider
 import pprint
-from control.settings_translate import useq_from_settings
+from isim_control.settings_translate import useq_from_settings
 
 mmc = CMMCorePlus()
 mmc.loadSystemConfiguration()
@@ -14,17 +15,18 @@ class iSIMMDAWidget(MDAWidget):
     def __init__(self, mmcore:CMMCorePlus, settings:dict, parent=None):
         self.settings = settings
         self.lasers = LaserPowers(settings)
-        self.twitchers = TwitcherSettings()
+        self.isim = iSIMSettingsTab()
         super().__init__(mmcore=mmc, parent=parent)
         self.tab_wdg.channels.layout().addWidget(self.lasers)
-        self.tab_wdg.addTab(self.twitchers, "Twitchers", checked=settings['twitchers'])
+        self.tab_wdg.addTab(self.isim, "iSIM", checked=True)
+        self.tab_wdg._cboxes[-1].hide()
         self.tab_wdg.setCurrentIndex(self.tab_wdg.indexOf(self.tab_wdg.channels))
         super().setValue(useq_from_settings(settings))
 
     def setValue(self, settings: dict):
         seq = useq_from_settings(settings)
         super().setValue(seq)
-        self.tab_wdg.setTabEnabled(self.tab_wdg.indexOf(self.twitchers), settings['twitchers'])
+        self.isim.set_state(settings)
         self.lasers.power_488.setValue(settings['ni']['laser_powers']['488'])
         self.lasers.power_561.setValue(settings['ni']['laser_powers']['561'])
 
@@ -32,7 +34,9 @@ class iSIMMDAWidget(MDAWidget):
         self.settings['acquisition'] = super().value().model_dump()
         self.settings['ni']['laser_powers']['488'] = self.lasers.power_488.value()
         self.settings['ni']['laser_powers']['561'] = self.lasers.power_561.value()
-        self.settings['twitchers'] = self.tab_wdg.isTabEnabled(self.tab_wdg.indexOf(self.twitchers))
+        isim_settings = self.isim.get_state()
+        for key,value in isim_settings.items():
+            self.settings[key] = value
         return self.settings
 
     def _on_run_clicked(self) -> None:
@@ -56,31 +60,49 @@ class LaserPowers(QWidget):
         self.layout().addWidget(self.power_561)
 
 
-class TwitcherSettings(QWidget):
+class iSIMSettingsTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
         text = """
-        Twitchers will be run with the default settings for optimized performance
-
-        These settings can be found directly in the device settings
-
+            Settings specific to the iSIM.
         """
+        self.setLayout(QGridLayout())
+
         self.label = QLabel(text)
-        self.setLayout(QVBoxLayout())
-        self.layout().addWidget(self.label)
+        self.layout().addWidget(self.label, 0, 0, 1, 2)
 
+        self.twitchers = QCheckBox("Twitchers")
+        self.twitchers.setChecked(True)
+        self.layout().addWidget(self.twitchers, 1, 0)
 
+        self.filters = QCheckBox("Filterwheel")
+        self.filters_label = QLabel("<i>This will slow down acquisition considerably</i>")
+        self.filters_label.setMinimumSize(100, 10)
+        self.filters_label.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.Maximum)
+        self.layout().addWidget(self.filters, 2, 0)
+        self.layout().addWidget(self.filters_label, 2, 1)
+
+    def set_state(self, settings: dict):
+        self.twitchers.setChecked(settings['twitchers'])
+        self.filters.setChecked(settings['use_filters'])
+
+    def get_state(self):
+        return {
+            "twitchers": self.twitchers.isChecked(),
+            "use_filters": self.filters.isChecked(),
+        }
 
 
 if __name__ == "__main__":
 
+    from isim_control.settings import iSIMSettings
+
     app = QApplication([])
-
-    settings = {"ni": {"laser_powers": {"488": 20, "561": 50}}}
-    settings['twitchers'] = True
-
-    frame = iSIMMDAWidget(mmcore=mmc, settings=settings)
+    acq = iSIMSettings(
+        time_plan = {"interval": 0.15, "loops": 10}
+        )
+    frame = iSIMMDAWidget(mmcore=mmc, settings=acq)
     frame.setWindowTitle("MyMDA")
 
     frame.show()
