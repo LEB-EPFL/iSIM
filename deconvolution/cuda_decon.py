@@ -18,8 +18,8 @@ from typing import Union
 import json
 
 import uuid
-import time  
-import os  
+import time
+import os
 import pdb
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 # os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = 'platform'
@@ -278,7 +278,13 @@ def decon_ome_stack(file_dir, params=None):
         mdInfo = xmltodict.parse(reader.ome_metadata)
         mdInfo['OME']['Image']["Pixels"]["@DimensionOrder"] = "XYCZT"
         mdInfo['OME']['Image']['@Name'] = os.path.basename(out_file).split('.')[0]
-        for frame_tiffdata in mdInfo['OME']['Image']['Pixels']['TiffData']:
+        frames_tiffdata = mdInfo['OME']['Image']['Pixels']['TiffData']
+        if isinstance(frames_tiffdata, list):
+            for frame_tiffdata in frames_tiffdata:
+                frame_tiffdata['UUID']['@FileName'] = os.path.basename(out_file)
+                frame_tiffdata['UUID']['#text'] =  'urn:uuid:' + str(UUID)
+        else:
+            frame_tiffdata = frames_tiffdata
             frame_tiffdata['UUID']['@FileName'] = os.path.basename(out_file)
             frame_tiffdata['UUID']['#text'] =  'urn:uuid:' + str(UUID)
 
