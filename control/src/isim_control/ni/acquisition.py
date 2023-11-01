@@ -7,16 +7,18 @@ import time
 import copy
 
 from useq import MDAEvent
-from control.ni.devices import NIDeviceGroup
+from isim_control.ni.devices import NIDeviceGroup
+from isim_control.settings import iSIMSettings
 
 class AcquisitionEngine(MDAEngine):
     def __init__(self, mmc: CMMCorePlus, device_group: NIDeviceGroup = None,
-                 settings: dict = None):
+                 settings: dict|None = None):
         super().__init__(mmc)
 
         self.pre_trigger_delay = 10 #ms
         self.mmc = mmc
-        self.settings = settings
+        self.settings = settings or iSIMSettings()
+        print("acq settings", self.settings)
         self.device_group = device_group
 
         self.task = nidaqmx.Task()
@@ -28,7 +30,8 @@ class AcquisitionEngine(MDAEngine):
         self.task.ao_channels.add_ao_voltage_chan('Dev1/ao5') # aotf 561 channel
         self.task.ao_channels.add_ao_voltage_chan('Dev1/ao6') # LED channel
         self.task.ao_channels.add_ao_voltage_chan('Dev1/ao7') # twitcher channel
-
+        self.task.timing.cfg_samp_clk_timing(rate=self.settings['ni']['sample_rate'],
+                                             sample_mode=nidaqmx.constants.AcquisitionType.CONTINUOUS)
         self.mmc.mda.events.sequenceFinished.connect(self.on_sequence_end)
 
         self.snap_lock = Lock()
@@ -74,6 +77,7 @@ class AcquisitionEngine(MDAEngine):
         next(self.internal_event_iterator)
         self.task.start()
         self.task.write(np.zeros(self.task.number_of_channels))
+        self._mmc.setPosition(self.settings['ni']['relative_z'])
 
     def update_settings(self, settings):
         self.settings = settings

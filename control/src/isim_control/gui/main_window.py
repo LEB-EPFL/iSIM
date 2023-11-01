@@ -10,16 +10,18 @@ from mda import iSIMMDAWidget
 import pprint
 import copy
 
-mmc = CMMCorePlus()
-mmc.loadSystemConfiguration()
+
 
 class MainWindow(QWidget):
-    def __init__(self, mmcore : CMMCorePlus = mmc, settings: dict = {}):
+    def __init__(self, publisher, settings: dict = {}):
         super().__init__()
         self.setWindowTitle("MyMDA")
         self.setLayout(QGridLayout())
 
-        self.mmc = mmcore
+
+        self.pub = publisher
+        self.running = False
+
         self.settings = settings
 
         self.live_button = QPushButton("Live")
@@ -89,7 +91,7 @@ class MainWindow(QWidget):
         self.live_led.setChecked(True)
 
     def _mda(self):
-        self.mda_window = iSIMMDAWidget(mmcore=self.mmc, settings=self.settings)
+        self.mda_window = iSIMMDAWidget(settings=self.settings, publisher=self.pub)
         self.mda_window.show()
 
     def _488_activate(self, toggle):
@@ -129,7 +131,12 @@ class MainWindow(QWidget):
         self.settings['live']['twitchers'] = toggle
 
     def _live(self):
-        pprint.pprint(self.settings)
+        print(self.running)
+        if self.running:
+            self.pub.publish("gui", "live_button_clicked", [True])
+        else:
+            self.pub.publish("gui", "live_button_clicked", [False])
+        self.running = not self.running
 
     def update_from_settings(self, settings: dict):
         self.live_power_488.setValue(settings['live']['ni']['laser_powers']['488'])
@@ -146,17 +153,49 @@ class MainWindow(QWidget):
 
 
 if __name__ == "__main__":
-    from control.settings import iSIMSettings
+    from isim_control.settings import iSIMSettings
+    from isim_control.pubsub import Publisher, Broker
+    from isim_control.runner import iSIMRunner
+    from isim_control.ni import live, acquisition, devices
     app = QApplication([])
+
+    broker = Broker()
+
+    mmc = CMMCorePlus()
+    mmc.loadSystemConfiguration("C:/iSIM/Micro-Manager-2.0.2/221130.cfg")
+    mmc.setCameraDevice("PrimeB_Camera")
+    mmc.setProperty("PrimeB_Camera", "TriggerMode", "Edge Trigger")
+    mmc.setProperty("PrimeB_Camera", "ReadoutRate", "100MHz 16bit")
+    mmc.setProperty("Sapphire", "State", 1)
+    mmc.setProperty("Quantum_561nm", "Laser Operation", "On")
+    mmc.setAutoShutter(False)
+
+    #Backend
+    isim_devices = devices.NIDeviceGroup()
+    live_engine = live.LiveEngine(None, mmc)
+    acq_engine = acquisition.AcquisitionEngine(mmc, isim_devices)
+    mmc.mda.set_engine(acq_engine)
+    print(mmc)
+    runner = iSIMRunner(mmc,
+                    live_engine=live_engine,
+                    acquisition_engine=acq_engine,
+                    devices=isim_devices)
+
+    broker.attach(runner)
 
     settings = iSIMSettings(time_plan = {"interval": 0.2, "loops": 20},)
     settings['twitchers'] = True
     default_settings = copy.deepcopy(settings)
-    frame = MainWindow(mmc, settings)
 
 
+    #GUI
+    frame = MainWindow(Publisher(broker.pub_queue), settings)
     frame.update_from_settings(default_settings)
     frame.show()
 
+    from pymmcore_widgets import ImagePreview
+    preview = ImagePreview(mmcore=mmc)
+    mmc.mda.events.frameReady.connect(preview._on_image_snapped)
+    preview.show()
 
     app.exec_()

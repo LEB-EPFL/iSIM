@@ -1,20 +1,20 @@
-from runner import iSIMRunner
-from pubsub import Publisher, Broker
+from isim_control.runner import iSIMRunner
+from isim_control.pubsub import Publisher, Broker
 from pymmcore_widgets import LiveButton
 from qtpy.QtWidgets import QApplication, QSpinBox, QVBoxLayout, QWidget, QPushButton, QSlider
 from pymmcore_plus import CMMCorePlus
-from control.ni import live, acquisition, devices
+from isim_control.ni import live, acquisition, devices
 import time
 
 
 def main():
     mmc = CMMCorePlus()
-    mmc.loadSystemConfiguration("C:/iSIM/Micro-Manager-2.0.2/prime_only.cfg")
-    mmc.setCameraDevice("Prime")
-    mmc.setProperty("Prime", "TriggerMode", "Edge Trigger")
-    mmc.setProperty("Prime", "ReadoutRate", "100MHz 16bit")
+    mmc.loadSystemConfiguration("C:/iSIM/Micro-Manager-2.0.2/221130.cfg")
+    mmc.setCameraDevice("PrimeB_Camera")
+    mmc.setProperty("PrimeB_Camera", "TriggerMode", "Edge Trigger")
+    mmc.setProperty("PrimeB_Camera", "ReadoutRate", "100MHz 16bit")
     mmc.setProperty("Sapphire", "State", 1)
-    mmc.setProperty("Laser", "Laser Operation", "On")
+    mmc.setProperty("Quantum_561nm", "Laser Operation", "On")
     mmc.setAutoShutter(False)
     time.sleep(1)
 
@@ -22,12 +22,15 @@ def main():
     broker = Broker()
 
     #Backend
-    devices = devices.NIDeviceGroup()
+    isim_devices = devices.NIDeviceGroup()
     live_engine = live.LiveEngine(None, mmc)
-    acq_engine = acquisition.AcquisitionEngine(mmc, devices)
+    acq_engine = acquisition.AcquisitionEngine(mmc, isim_devices)
 
     mmc.mda.set_engine(acq_engine)
-    runner = iSIMRunner(mmc, live_engine=live_engine, acquisition_engine=acq_engine, devices=devices)
+    runner = iSIMRunner(mmc,
+                        live_engine=live_engine,
+                        acquisition_engine=acq_engine,
+                        devices=isim_devices)
     broker.attach(runner)
 
     #GUI

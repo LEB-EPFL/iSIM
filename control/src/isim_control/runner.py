@@ -1,8 +1,8 @@
-from pubsub import Subscriber
 from pymmcore_plus import CMMCorePlus
-from settings import iSIMSettings
-from control.ni import live, acquisition, devices
-from settings_translate import useq_from_settings
+from isim_control.pubsub import Subscriber
+from isim_control.settings import iSIMSettings
+from isim_control.ni import live, acquisition, devices
+from isim_control.settings_translate import useq_from_settings
 
 
 class iSIMRunner:

@@ -25,8 +25,6 @@ class iSIMSettings(dict):
                  ):
         super().__init__()
         self['use_filters'] = use_filters
-        self['relative_z'] = relative_z
-        self['twitchers'] = twitchers
         self['acquisition'] = {}
         self['acquisition']['axis_order'] = axis_order
         self['acquisition']['channels'] = channels
@@ -40,6 +38,8 @@ class iSIMSettings(dict):
         self['camera']['readout_time'] = camera_readout_time
 
         self['ni'] = {}
+        self['ni']['twitchers'] = twitchers
+        self['ni']['relative_z'] = relative_z
         self['ni']['laser_powers'] = laser_powers
         self['ni']['sample_rate'] = ni_sample_rate
 
@@ -85,12 +85,13 @@ if __name__ == "__main__":
     import time
     from ni.acquisition import AcquisitionEngine
     mmc = CMMCorePlus()
-    mmc.loadSystemConfiguration("C:/iSIM/Micro-Manager-2.0.2/prime_only.cfg")
-    mmc.setCameraDevice("Prime")
-    mmc.setProperty("Prime", "TriggerMode", "Edge Trigger")
-    mmc.setProperty("Prime", "ReadoutRate", "100MHz 16bit")
+    mmc.loadSystemConfiguration("C:/iSIM/Micro-Manager-2.0.2/221130.cfg")
+    print(mmc.getCameraDevice())
+    mmc.setCameraDevice("PrimeB_Camera")
+    mmc.setProperty("PrimeB_Camera", "TriggerMode", "Edge Trigger")
+    mmc.setProperty("PrimeB_Camera", "ReadoutRate", "100MHz 16bit")
     mmc.setProperty("Sapphire", "State", 1)
-    mmc.setProperty("Laser", "Laser Operation", "On")
+    mmc.setProperty("Quantum_561nm", "Laser Operation", "On")
     mmc.setAutoShutter(False)
     time.sleep(1)
 
@@ -101,18 +102,21 @@ if __name__ == "__main__":
     preview.show()
 
     acq = iSIMSettings(
-        time_plan = {"interval": 0.15, "loops": 10}
+        time_plan = {"interval": 3, "loops": 2}
         )
     acq = add_settings_from_core(mmc, acq)
     acq.calculate_ni_settings()
-
+    acq['twitchers'] = False
+    acq['ni']['relative_z'] = 129.34 # um
+    acq["acquisition"]["z_plan"] = {'range': 10, 'step': 2, }
+    acq["acquisition"]["channels"] = ({"config": "LED"}, {'config': "488"})
 
     devices = NIDeviceGroup(acq['ni'])
     seq = useq_from_settings(acq)
     # mmc.setExposure((acq['exposure_time'] - acq['camera']['readout_time'])*1000)
     EXPOSURE = (acq['exposure_time'] + acq['camera']['readout_time'])*1000
     mmc.setExposure(EXPOSURE)
-    print("Effective camera exposure", EXPOSURE)
+    print("Effective camera exposure", mmc.getExposure())
 
     engine = AcquisitionEngine(mmc, devices, acq)
     # print(engine.task.timing.samp_clk_rate)
@@ -121,9 +125,10 @@ if __name__ == "__main__":
     mmc.run_mda(seq)
     app.exec_()
 
-    # import matplotlib.pyplot as plt
-    # data = devices.get_data(next(seq.iter_events()))
-    # for device in data:
-    #     plt.step(np.arange(len(device))/acq['ni']['sample_rate'], device)
-    # plt.legend(np.arange(data.shape[0]))
-    # plt.show()
+
+    import matplotlib.pyplot as plt
+    data = devices.get_data(next(seq.iter_events()))
+    for device in data:
+        plt.step(np.arange(len(device))/acq['ni']['sample_rate'], device)
+    plt.legend(np.arange(data.shape[0]))
+    plt.show()
