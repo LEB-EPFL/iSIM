@@ -2,24 +2,23 @@
 from qtpy.QtWidgets import (QApplication, QPushButton, QWidget, QGridLayout, QGroupBox,
                             QRadioButton, QSpinBox, QLabel, QCheckBox)
 from qtpy.QtCore import Qt
-from pymmcore_plus import CMMCorePlus
+
+from pymmcore_widgets import GroupPresetTableWidget
 from superqt import QLabeledSlider
+from isim_control.gui.dark_theme import slider_theme
 
 from mda import iSIMMDAWidget
 
 import pprint
 import copy
 
-mmc = CMMCorePlus()
-mmc.loadSystemConfiguration()
-
 class MainWindow(QWidget):
-    def __init__(self, mmcore : CMMCorePlus = mmc, settings: dict = {}):
+    def __init__(self, settings: dict = {}):
         super().__init__()
         self.setWindowTitle("MyMDA")
         self.setLayout(QGridLayout())
 
-        self.mmc = mmcore
+
         self.settings = settings
 
         self.live_button = QPushButton("Live")
@@ -51,8 +50,8 @@ class MainWindow(QWidget):
         self.live_power_led.setRange(0, 100)
         self.live_power_led.setValue(settings['live']['ni']['laser_powers']['led'])
         self.live_power_led.valueChanged.connect(self._led_value_changed)
-        self.live_power_led.setStyleSheet(
-            "QSlider::handle:horizontal:enabled {background-color: grey;}")
+        self.live_power_led.setStyleSheet(slider_theme())
+        print(self.live_power_488.style().metaObject())
 
         self.live_fps = QSpinBox()
         self.live_fps.valueChanged.connect(self.live_fps_changed)
@@ -64,6 +63,7 @@ class MainWindow(QWidget):
         self.twitchers.toggled.connect(self._twitchers_changed)
         self.twitchers.setChecked(settings['live']['twitchers'])
 
+        self.group_presets = GroupPresetTableWidget()
 
         self.channelBox.setLayout(QGridLayout())
         self.channelBox.layout().addWidget(self.live_488, 0, 0)
@@ -83,13 +83,15 @@ class MainWindow(QWidget):
 
         self.layout().addWidget(self.channelBox, 0, 1, 3, 1)
 
+        self.layout().addWidget(self.group_presets, 4, 0, 1, 3)
+
 
         self.mda_button.pressed.connect(self._mda)
 
         self.live_led.setChecked(True)
 
     def _mda(self):
-        self.mda_window = iSIMMDAWidget(mmcore=self.mmc, settings=self.settings)
+        self.mda_window = iSIMMDAWidget(settings=self.settings)
         self.mda_window.show()
 
     def _488_activate(self, toggle):
@@ -146,17 +148,22 @@ class MainWindow(QWidget):
 
 
 if __name__ == "__main__":
-    from control.settings import iSIMSettings
+    from isim_control.settings import iSIMSettings
+    from pymmcore_plus import CMMCorePlus
+    from isim_control.gui.dark_theme import set_dark
     app = QApplication([])
+    set_dark(app)
 
     settings = iSIMSettings(time_plan = {"interval": 0.2, "loops": 20},)
     settings['twitchers'] = True
     default_settings = copy.deepcopy(settings)
-    frame = MainWindow(mmc, settings)
+    frame = MainWindow(settings)
 
 
     frame.update_from_settings(default_settings)
     frame.show()
 
+    mmc = CMMCorePlus.instance()
+    mmc.loadSystemConfiguration("D:/Programs/Micro-Manager-2.0.1/MMConfig_demo.cfg")
 
     app.exec_()
