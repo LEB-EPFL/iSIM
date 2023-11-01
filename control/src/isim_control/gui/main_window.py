@@ -1,4 +1,5 @@
 
+
 from qtpy.QtWidgets import (QApplication, QPushButton, QWidget, QGridLayout, QGroupBox,
                             QRadioButton, QSpinBox, QLabel, QCheckBox)
 from qtpy.QtCore import Qt
@@ -6,6 +7,7 @@ from qtpy.QtCore import Qt
 from pymmcore_widgets import GroupPresetTableWidget
 from superqt import QLabeledSlider
 from isim_control.gui.dark_theme import slider_theme
+from isim_control.gui.dark_theme import set_dark
 
 from mda import iSIMMDAWidget
 
@@ -44,18 +46,18 @@ class MainWindow(QWidget):
         self.live_power_488.setValue(settings['live']['ni']['laser_powers']['488'])
         self.live_power_488.valueChanged.connect(self._488_value_changed)
         self.live_power_488.setDisabled(True)
+        self.live_power_488.setStyleSheet(slider_theme("#00f7ff"))
         self.live_power_561 = QLabeledSlider(Qt.Orientation.Horizontal)
         self.live_power_561.setRange(0, 100)
         self.live_power_561.setValue(settings['live']['ni']['laser_powers']['561'])
         self.live_power_561.valueChanged.connect(self._561_value_changed)
-        self.live_power_561.setStyleSheet(
-            "QSlider::handle:horizontal:enabled {background-color: green;}")
+        self.live_power_561.setStyleSheet(slider_theme("#c6ff00"))
         self.live_power_561.setDisabled(True)
         self.live_power_led = QLabeledSlider(Qt.Orientation.Horizontal)
         self.live_power_led.setRange(0, 100)
         self.live_power_led.setValue(settings['live']['ni']['laser_powers']['led'])
         self.live_power_led.valueChanged.connect(self._led_value_changed)
-        self.live_power_led.setStyleSheet(slider_theme())
+        self.live_power_led.setStyleSheet(slider_theme("#BBBBBB"))
         print(self.live_power_488.style().metaObject())
 
         self.live_fps = QSpinBox()
@@ -88,7 +90,7 @@ class MainWindow(QWidget):
 
         self.layout().addWidget(self.channelBox, 0, 1, 3, 1)
 
-        self.layout().addWidget(self.group_presets, 4, 0, 1, 3)
+        self.layout().addWidget(self.group_presets, 5, 0, 1, 3)
 
 
         self.mda_button.pressed.connect(self._mda)
@@ -162,32 +164,43 @@ if __name__ == "__main__":
     from isim_control.pubsub import Publisher, Broker
     from isim_control.runner import iSIMRunner
     from isim_control.ni import live, acquisition, devices
+    from pymmcore_plus import CMMCorePlus
     app = QApplication([])
     set_dark(app)
 
     broker = Broker()
 
     mmc = CMMCorePlus()
-    mmc.loadSystemConfiguration("C:/iSIM/Micro-Manager-2.0.2/221130.cfg")
-    mmc.setCameraDevice("PrimeB_Camera")
-    mmc.setProperty("PrimeB_Camera", "TriggerMode", "Edge Trigger")
-    mmc.setProperty("PrimeB_Camera", "ReadoutRate", "100MHz 16bit")
-    mmc.setProperty("Sapphire", "State", 1)
-    mmc.setProperty("Quantum_561nm", "Laser Operation", "On")
+    try:
+        mmc.loadSystemConfiguration("C:/iSIM/Micro-Manager-2.0.2/221130.cfg")
+        mmc.setCameraDevice("PrimeB_Camera")
+        mmc.setProperty("PrimeB_Camera", "TriggerMode", "Edge Trigger")
+        mmc.setProperty("PrimeB_Camera", "ReadoutRate", "100MHz 16bit")
+        mmc.setProperty("Sapphire", "State", 1)
+        mmc.setProperty("Quantum_561nm", "Laser Operation", "On")
+
+        #Backend
+        isim_devices = devices.NIDeviceGroup()
+        live_engine = live.LiveEngine(None, mmc)
+        acq_engine = acquisition.AcquisitionEngine(mmc, isim_devices)
+        mmc.mda.set_engine(acq_engine)
+        print(mmc)
+        runner = iSIMRunner(mmc,
+                        live_engine=live_engine,
+                        acquisition_engine=acq_engine,
+                        devices=isim_devices)
+
+        broker.attach(runner)
+
+        from pymmcore_widgets import ImagePreview
+        preview = ImagePreview(mmcore=mmc)
+        mmc.mda.events.frameReady.connect(preview._on_image_snapped)
+        preview.show()
+    except FileNotFoundError:
+        # Not on the iSIM
+        mmc.loadSystemConfiguration()
     mmc.setAutoShutter(False)
 
-    #Backend
-    isim_devices = devices.NIDeviceGroup()
-    live_engine = live.LiveEngine(None, mmc)
-    acq_engine = acquisition.AcquisitionEngine(mmc, isim_devices)
-    mmc.mda.set_engine(acq_engine)
-    print(mmc)
-    runner = iSIMRunner(mmc,
-                    live_engine=live_engine,
-                    acquisition_engine=acq_engine,
-                    devices=isim_devices)
-
-    broker.attach(runner)
 
     settings = iSIMSettings(time_plan = {"interval": 0.2, "loops": 20},)
     settings['twitchers'] = True
@@ -199,9 +212,6 @@ if __name__ == "__main__":
     frame.update_from_settings(default_settings)
     frame.show()
 
-    from pymmcore_widgets import ImagePreview
-    preview = ImagePreview(mmcore=mmc)
-    mmc.mda.events.frameReady.connect(preview._on_image_snapped)
-    preview.show()
+
 
     app.exec_()

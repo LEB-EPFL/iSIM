@@ -28,27 +28,44 @@ def set_dark(app: QApplication):
     app.setPalette(dark_palette)
 
 
-def slider_theme(groove_color: str = "#990000"):
-    return     """QSlider::groove:horizontal:enabled {
-    border: 1px solid #000000;
-    height: 1px; /* the groove expands to the size of the slider by default. by giving it a height, it has a fixed size */
+def slider_theme(groove_color: str = "red"):
+    return     """QSlider::groove:horizontal {
+    height: 5px; /* the groove expands to the size of the slider by default. by giving it a height, it has a fixed size */
     border-radius: 2 px;
-    margin: 2 px 0 px;
+    margin: 0 px 0 px;
     }
 
     QSlider::add-page:horizontal:enabled {
         background: #353535;
+        border: 1px solid #252525;
     }
 
     QSlider::sub-page:horizontal:enabled {
-        background: green;
+        background: """+ groove_color + """;
+        border: 1px solid #252525;
     }
 
-    QSlider::handle:horizontal:enabled {
-        background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #535353, stop:1 #535353);
-        border: 1px solid #535353;
-        width: 10px;
-        margin: -6px 0; /* handle is placed by default on the contents rect of the groove. Expand outside the groove */
-        border-radius: 3px;
+    QSlider::add-page:horizontal:!enabled {
+        background: #353535;
+        border: 1px solid #252525;
     }
+
+    QSlider::sub-page:horizontal:!enabled{
+        background: #535353;
+        border: 1px solid #252525;
+    }
+
+    QSlider::handle:horizontal {
+        border-image: url(control/src/isim_control/gui/assets/handle.png);
+        width: 17px;
+        height: 15px;
+        margin: -7px 0;
+        }
     """
+    # QSlider::handle:horizontal {
+    #     background: qradialgradient(cx: .5, cy: .5, radius: 4, fx: .5, fy: .5, stop: 0 #535353, stop: 2 #535353, stop: 2 #FFFFFF);
+    #     border: 1px solid #252525;
+    #     margin: -4px 0; /* handle is placed by default on the contents rect of the groove. Expand outside the groove */
+    #     width: 11px;
+    #     height: 11px;
+    #     border-radius: 3px;
