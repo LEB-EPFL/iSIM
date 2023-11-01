@@ -20,7 +20,10 @@ class NIDeviceGroup():
         camera = self.camera.one_frame(self.settings)[:-self.settings['readout_points']//3]
         aotf = self.aotf.one_frame(self.settings, event)[:, :-self.settings['readout_points']//3]
         led = self.led.one_frame(self.settings, event)[:, :-self.settings['readout_points']//3]
-        twitcher = self.twitcher.one_frame(self.settings)[:-self.settings['readout_points']//3]
+        if self.settings['twitchers']:
+            twitcher = self.twitcher.one_frame(self.settings)[:-self.settings['readout_points']//3]
+        else:
+            twitcher = np.zeros(galvo.shape)
         return np.vstack([galvo, stage, camera, aotf, led, twitcher])
 
     def update_settings(self, settings: dict):
@@ -130,6 +133,7 @@ class AOTF(DAQDevice):
         elif event.channel.config == 'LED':
             aotf_488 = np.zeros(n_points)
             aotf_561 = np.zeros(n_points)
+            blank = np.zeros(n_points)
         aotf = np.vstack((blank, aotf_488, aotf_561))
         aotf = self.add_readout(aotf, settings['readout_points'])
         return aotf
@@ -148,7 +152,9 @@ class Stage(DAQDevice):
 
     def one_frame(self, settings: dict, event: useq.MDAEvent,
                   next_event: useq.MDAEvent|None = None) -> np.ndarray:
-        height_offset = event.z_pos or 0
+        # relative_z = settings['relative_z']
+        # height_offset = relative_z if event.z_pos is None else (event.z_pos + relative_z)
+        height_offset = 0 if event.z_pos is None else event.z_pos
         height_offset = self.convert_z(height_offset)
         stage_frame = (np.ones(settings['readout_points'] + settings['exposure_points']) *
                        height_offset)
@@ -170,10 +176,13 @@ class Stage(DAQDevice):
 
 class LED(DAQDevice):
     def __init__(self):
-        self.power = 10
+        self.power = 5
         self.speed_adjustment = 0.98
 
     def one_frame(self, settings: dict, event:useq.MDAEvent, power = None) -> np.ndarray:
+        if event.channel.config != 'LED':
+            return np.expand_dims(np.zeros(settings['total_points'] +
+                                           settings['readout_points']), 0)
         self.adjusted_readout = (settings['readout_points'] / settings['sample_rate']
                                  * self.speed_adjustment)
         n_points = (settings['total_points'] -

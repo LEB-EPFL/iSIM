@@ -7,16 +7,17 @@ from superqt import QLabeledSlider
 import pprint
 from isim_control.settings_translate import useq_from_settings
 
-mmc = CMMCorePlus()
-mmc.loadSystemConfiguration()
+# mmc = CMMCorePlus()
+# mmc.loadSystemConfiguration()
 
 
 class iSIMMDAWidget(MDAWidget):
-    def __init__(self, mmcore:CMMCorePlus, settings:dict, parent=None):
+    def __init__(self, settings:dict, publisher, parent=None):
         self.settings = settings
         self.lasers = LaserPowers(settings)
         self.isim = iSIMSettingsTab()
-        super().__init__(mmcore=mmc, parent=parent)
+        self.pub = publisher
+        super().__init__(parent=parent)
         self.tab_wdg.channels.layout().addWidget(self.lasers)
         self.tab_wdg.addTab(self.isim, "iSIM", checked=True)
         self.tab_wdg._cboxes[-1].hide()
@@ -41,6 +42,7 @@ class iSIMMDAWidget(MDAWidget):
 
     def _on_run_clicked(self) -> None:
         pprint.pprint(self.get_settings())
+        self.pub.publish("gui", "acquisition_button_clicked", [True])
 
 
 class LaserPowers(QWidget):
@@ -102,7 +104,7 @@ if __name__ == "__main__":
     acq = iSIMSettings(
         time_plan = {"interval": 0.15, "loops": 10}
         )
-    frame = iSIMMDAWidget(mmcore=mmc, settings=acq)
+    frame = iSIMMDAWidget(settings=acq)
     frame.setWindowTitle("MyMDA")
 
     frame.show()
