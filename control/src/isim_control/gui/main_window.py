@@ -1,7 +1,7 @@
 
 
 from qtpy.QtWidgets import (QApplication, QPushButton, QWidget, QGridLayout, QGroupBox,
-                            QRadioButton, QSpinBox, QLabel, QCheckBox)
+                            QRadioButton, QSpinBox, QLabel, QCheckBox, QMainWindow)
 from qtpy.QtCore import Qt
 
 from pymmcore_widgets import GroupPresetTableWidget
@@ -16,11 +16,15 @@ import copy
 
 
 
-class MainWindow(QWidget):
+class MainWindow(QMainWindow):
     def __init__(self, publisher, settings: dict = {}):
         super().__init__()
         self.setWindowTitle("MyMDA")
-        self.setLayout(QGridLayout())
+
+        self.main = QWidget()
+        self.setCentralWidget(self.main)
+
+        self.main.setLayout(QGridLayout())
 
 
         self.pub = publisher
@@ -80,22 +84,25 @@ class MainWindow(QWidget):
         self.channelBox.layout().addWidget(self.live_power_561, 1, 1)
         self.channelBox.layout().addWidget(self.live_power_led, 2, 1)
 
-        self.layout().addWidget(self.live_button, 0, 0, 3, 1)
-        self.layout().addWidget(self.snap_button, 3, 0)
-        self.layout().addWidget(self.mda_button, 4, 0)
+        self.main.layout().addWidget(self.live_button, 0, 0,)
+        self.main.layout().addWidget(self.snap_button, 1, 0)
+        self.main.layout().addWidget(self.mda_button, 2, 0)
 
-        self.layout().addWidget(self.live_fps_label, 0, 2)
-        self.layout().addWidget(self.live_fps, 0, 3)
-        self.layout().addWidget(self.twitchers, 1, 2, 1, 2)
+        self.main.layout().addWidget(self.live_fps_label, 0, 2)
+        self.main.layout().addWidget(self.live_fps, 0, 3)
+        self.main.layout().addWidget(self.twitchers, 1, 2, 1, 2)
 
-        self.layout().addWidget(self.channelBox, 0, 1, 3, 1)
+        self.main.layout().addWidget(self.channelBox, 0, 1, 3, 1)
 
-        self.layout().addWidget(self.group_presets, 5, 0, 1, 3)
+        self.main.layout().addWidget(self.group_presets, 5, 0, 1, 3)
 
 
         self.mda_button.pressed.connect(self._mda)
 
         self.live_led.setChecked(True)
+        self.live_power_488.installEventFilter(self)
+        self.live_power_561.installEventFilter(self)
+        self.live_power_led.installEventFilter(self)
 
     def _mda(self):
         self.mda_window = iSIMMDAWidget(settings=self.settings, publisher=self.pub)
@@ -158,6 +165,18 @@ class MainWindow(QWidget):
         else:
             self.live_led.setChecked(True)
 
+    def eventFilter(self, obj, event):
+        # Enable sliders by clicking
+        sliders = [self.live_power_488, self.live_power_561, self.live_power_led]
+        radios = [self.live_488, self.live_561, self.live_led]
+        if event.type() == 2:
+            for slider, radio in zip(sliders, radios):
+                if obj == slider:
+                    slider.setDisabled(False)
+                    radio.setChecked(True)
+                else:
+                    slider.setDisabled(True)
+        return super().eventFilter(obj, event)
 
 if __name__ == "__main__":
     from isim_control.settings import iSIMSettings
