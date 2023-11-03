@@ -6,7 +6,7 @@ flowchart TD;
     iSIMEngine{iSIMEngine}
     control.gui{control.gui}
     iSIMRunner{iSIMRunner \n iSIMSettings}
-    iSIMSettings{iSIMSettings}
+
     devices{devices}
     NIDAQ[[NIDAQ]]
     nidaqmx((nidaqmx))

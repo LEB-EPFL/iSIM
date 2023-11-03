@@ -58,7 +58,6 @@ class MainWindow(QWidget):
         self.live_power_led.setValue(settings['live']['ni']['laser_powers']['led'])
         self.live_power_led.valueChanged.connect(self._led_value_changed)
         self.live_power_led.setStyleSheet(slider_theme("#BBBBBB"))
-        print(self.live_power_488.style().metaObject())
 
         self.live_fps = QSpinBox()
         self.live_fps.valueChanged.connect(self.live_fps_changed)
@@ -184,7 +183,7 @@ if __name__ == "__main__":
         live_engine = live.LiveEngine(None, mmc)
         acq_engine = acquisition.AcquisitionEngine(mmc, isim_devices)
         mmc.mda.set_engine(acq_engine)
-        print(mmc)
+
         runner = iSIMRunner(mmc,
                         live_engine=live_engine,
                         acquisition_engine=acq_engine,
