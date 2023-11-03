@@ -1,6 +1,6 @@
-from pymmcore_widgets.mda._core_mda import MDAWidget
+from pymmcore_widgets.useq_widgets._mda_sequence import MDASequenceWidget
 from qtpy.QtWidgets import (QApplication, QWidget, QLabel, QVBoxLayout, QCheckBox, QSizePolicy,
-                            QGridLayout)
+                            QGridLayout, QTabBar)
 from qtpy.QtCore import Qt
 from pymmcore_plus import CMMCorePlus
 from superqt import QLabeledSlider
@@ -11,17 +11,14 @@ from isim_control.settings_translate import useq_from_settings
 # mmc.loadSystemConfiguration()
 
 
-class iSIMMDAWidget(MDAWidget):
+class iSIMMDAWidget(MDASequenceWidget):
     def __init__(self, settings:dict, publisher, parent=None):
         self.settings = settings
         self.lasers = LaserPowers(settings)
         self.isim = iSIMSettingsTab()
         self.pub = publisher
         super().__init__(parent=parent)
-        self.tab_wdg.channels.layout().addWidget(self.lasers)
-        self.tab_wdg.addTab(self.isim, "iSIM", checked=True)
-        self.tab_wdg._cboxes[-1].hide()
-        self.tab_wdg.setCurrentIndex(self.tab_wdg.indexOf(self.tab_wdg.channels))
+        self.layout().addWidget(self.isim)
         super().setValue(useq_from_settings(settings))
 
     def setValue(self, settings: dict):
