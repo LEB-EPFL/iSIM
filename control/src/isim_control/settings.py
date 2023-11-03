@@ -1,6 +1,7 @@
 import numpy as np
 from functools import reduce
 import operator
+from typing import Dict, Any
 
 class iSIMSettings(dict):
     """Central dict that holds all data necessary to run the iSIM.
@@ -43,7 +44,7 @@ class iSIMSettings(dict):
         self['ni']['laser_powers'] = laser_powers
         self['ni']['sample_rate'] = ni_sample_rate
 
-        self['live'] = {"channel": "561", "fps": 5, "twitchers": False}
+        self['live']: Dict[str, Any] = {"channel": "561", "fps": 5, "twitchers": False}
         self['live']['ni'] = {"laser_powers": {'488': 50, '561': 50, 'led': 100}}
 
         self['live_mode'] = False

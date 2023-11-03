@@ -4,7 +4,7 @@ from qtpy.QtWidgets import (QApplication, QPushButton, QWidget, QGridLayout, QGr
                             QRadioButton, QSpinBox, QLabel, QCheckBox)
 from qtpy.QtCore import Qt
 
-from pymmcore_widgets import GroupPresetTableWidget
+from pymmcore_widgets import GroupPresetTableWidget, StageWidget
 from superqt import QLabeledSlider
 from isim_control.gui.dark_theme import slider_theme
 from isim_control.gui.dark_theme import set_dark
@@ -19,9 +19,6 @@ import copy
 class MainWindow(QWidget):
     def __init__(self, publisher, settings: dict = {}):
         super().__init__()
-        self.setWindowTitle("MyMDA")
-        self.setLayout(QGridLayout())
-
 
         self.pub = publisher
         self.running = False
@@ -71,6 +68,8 @@ class MainWindow(QWidget):
 
         self.group_presets = GroupPresetTableWidget()
 
+        self.setWindowTitle("MyMDA")
+        self.setLayout(QGridLayout())
         self.channelBox.setLayout(QGridLayout())
         self.channelBox.layout().addWidget(self.live_488, 0, 0)
         self.channelBox.layout().addWidget(self.live_561, 1, 0)
@@ -106,9 +105,11 @@ class MainWindow(QWidget):
             self.live_power_488.setDisabled(False)
         else:
             self.live_power_488.setDisabled(True)
+        self.pub.publish("gui", "settings_change", [['live', "channel"], self.settings['live']['channel']])
 
     def _488_value_changed(self, value):
         self.settings['live']['ni']['laser_powers']['488'] = value
+        self.pub.publish("gui", "settings_change", [['live', "ni", "laser_powers", "488"], value])
 
     def _561_activate(self, toggle):
         if toggle:
@@ -116,9 +117,11 @@ class MainWindow(QWidget):
             self.live_power_561.setDisabled(False)
         else:
             self.live_power_561.setDisabled(True)
+        self.pub.publish("gui", "settings_change", [['live', "channel"], self.settings['live']['channel']])
 
     def _561_value_changed(self, value):
         self.settings['live']['ni']['laser_powers']['561'] = value
+        self.pub.publish("gui", "settings_change", [['live', "ni", "laser_powers", "561"], value])
 
     def _led_activate(self, toggle):
         if toggle:
@@ -126,15 +129,19 @@ class MainWindow(QWidget):
             self.live_power_led.setDisabled(False)
         else:
             self.live_power_led.setDisabled(True)
+        self.pub.publish("gui", "settings_change", [['live', "channel"], self.settings['live']['channel']])
 
     def _led_value_changed(self, value):
         self.settings['live']['ni']['laser_powers']['led'] = value
+        self.pub.publish("gui", "settings_change", [['live', "ni", "laser_powers", "led"], value])
 
     def live_fps_changed(self, value):
         self.settings['live']['fps'] = value
+        self.pub.publish("gui", "settings_change", [['live', "fps"], value])
 
     def _twitchers_changed(self, toggle):
         self.settings['live']['twitchers'] = toggle
+        self.pub.publish("gui", "settings_change", [['live', "twitchers"], toggle])
 
     def _live(self):
         print(self.running)
@@ -158,6 +165,17 @@ class MainWindow(QWidget):
             self.live_led.setChecked(True)
 
 
+
+class iSIM_StageWidget(QWidget):
+    def __init__(self, mmc):
+        super().__init__()
+        stage1 = StageWidget("MicroDrive XY Stage", mmcore=mmc)
+        stage2 = StageWidget("MCL NanoDrive Z Stage", mmcore=mmc)
+        self.setLayout(QGridLayout())
+        self.layout().addWidget(stage1, 2, 0)
+        self.layout().addWidget(stage2, 2, 1)
+
+
 if __name__ == "__main__":
     from isim_control.settings import iSIMSettings
     from isim_control.pubsub import Publisher, Broker
@@ -170,6 +188,11 @@ if __name__ == "__main__":
     broker = Broker()
 
     mmc = CMMCorePlus()
+    print(mmc)
+    settings = iSIMSettings(time_plan = {"interval": 0.2, "loops": 20},)
+    settings['twitchers'] = True
+
+
     try:
         mmc.loadSystemConfiguration("C:/iSIM/Micro-Manager-2.0.2/221130.cfg")
         mmc.setCameraDevice("PrimeB_Camera")
@@ -177,17 +200,21 @@ if __name__ == "__main__":
         mmc.setProperty("PrimeB_Camera", "ReadoutRate", "100MHz 16bit")
         mmc.setProperty("Sapphire", "State", 1)
         mmc.setProperty("Quantum_561nm", "Laser Operation", "On")
+        mmc.setExposure(129)
+        mmc.setAutoShutter(False)
 
         #Backend
-        isim_devices = devices.NIDeviceGroup()
-        live_engine = live.LiveEngine(None, mmc)
+        isim_devices = devices.NIDeviceGroup(settings=settings)
         acq_engine = acquisition.AcquisitionEngine(mmc, isim_devices)
+        live_engine = live.LiveEngine(task = acq_engine.task, mmcore=mmc, settings=settings,
+                                      device_group=isim_devices)
         mmc.mda.set_engine(acq_engine)
 
         runner = iSIMRunner(mmc,
                         live_engine=live_engine,
                         acquisition_engine=acq_engine,
-                        devices=isim_devices)
+                        devices=isim_devices,
+                        settings = settings)
 
         broker.attach(runner)
 
@@ -197,12 +224,10 @@ if __name__ == "__main__":
         preview.show()
     except FileNotFoundError:
         # Not on the iSIM
+        print("iSIM components could not be loaded.")
         mmc.loadSystemConfiguration()
-    mmc.setAutoShutter(False)
 
 
-    settings = iSIMSettings(time_plan = {"interval": 0.2, "loops": 20},)
-    settings['twitchers'] = True
     default_settings = copy.deepcopy(settings)
 
 
@@ -210,6 +235,9 @@ if __name__ == "__main__":
     frame = MainWindow(Publisher(broker.pub_queue), settings)
     frame.update_from_settings(default_settings)
     frame.show()
+
+    stages = iSIM_StageWidget(mmc)
+    stages.show()
 
 
 

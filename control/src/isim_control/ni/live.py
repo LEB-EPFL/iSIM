@@ -16,7 +16,7 @@ class LiveEngine():
                  mmcore: CMMCorePlus = None,
                  settings: dict = None):
         self._mmc = mmcore or CMMCorePlus.instance()
-        self.settings = settings or {}
+        self.settings = settings or iSIMSettings()
         self.fps = 5
         self.timer = None
         self.devices = device_group
@@ -57,11 +57,11 @@ class LiveEngine():
         self.task.stop()
 
     def update_settings(self, settings):
-        self.settings = settings
+        self.settings = settings['live']
         if self.timer:
-            if settings['fps'] != self.fps:
-                self.timer.interval = 1/settings['fps']
-        self.fps = settings['fps']
+            if self.settings['fps'] != self.fps:
+                self.timer.interval = 1/self.settings['fps']
+        self.fps = self.settings['fps']
 
 
 class LiveTimer(Timer):
@@ -76,9 +76,9 @@ class LiveTimer(Timer):
             self.task.write(self.one_frame())
 
     def one_frame(self):
-        event = MDAEvent(channel={'config':self.settings['live']['channel']})
+        event = MDAEvent(channel={'config':self.settings['channel']})
         next_event = event
-        return self.devices.get_data(event, next_event)
+        return self.devices.get_data(event, next_event, live=True)
 
 
 

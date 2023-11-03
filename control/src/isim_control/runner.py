@@ -7,14 +7,15 @@ from isim_control.settings_translate import useq_from_settings
 
 class iSIMRunner:
     def __init__(self, mmcore: CMMCorePlus, live_engine: live.LiveEngine,
-                 acquisition_engine: acquisition.AcquisitionEngine, devices: devices.NIDeviceGroup):
+                 acquisition_engine: acquisition.AcquisitionEngine, devices: devices.NIDeviceGroup,
+                 settings: iSIMSettings = None):
         self.mmc = mmcore or CMMCorePlus.instance()
         routes = {"live_button_clicked": [self._on_live_toggle],
                   "acquisition_button_clicked": [self._on_acquisition_started],
                   "settings_change": [self._on_settings_change]}
         self.sub = Subscriber(["gui"], routes)
 
-        self.settings = iSIMSettings()
+        self.settings = settings or iSIMSettings()
         self.live_engine = live_engine
         self.acquisition_engine = acquisition_engine
         self.devices = devices
@@ -32,7 +33,7 @@ class iSIMRunner:
     def _on_live_toggle(self, toggled):
         print(f"Broker: live toggled {toggled}")
         if toggled:
-            self.live_engine.update_settings(self.settings['live'])
+            self.live_engine.update_settings(self.settings)
             self.mmc.startContinuousSequenceAcquisition()
         else:
             self.mmc.stopSequenceAcquisition()
@@ -41,7 +42,10 @@ class iSIMRunner:
         print(f"Broker: settings changed {keys} to {value}")
         self.settings.set_by_path(keys, value)
         if "live" in keys:
-            self.live_engine.update_settings(self.settings['live'])
+            self.live_engine.update_settings(self.settings)
+        if "acquisition" in keys:
+            self.acquisition_engine.update_settings(self.settings)
+
 
     def stop(self):
         self.sub.stop()

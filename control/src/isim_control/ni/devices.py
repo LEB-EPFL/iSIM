@@ -14,14 +14,15 @@ class NIDeviceGroup():
         self.led = LED()
         self.settings = settings or {}
 
-    def get_data(self, event: useq.MDAEvent, next_event: useq.MDAEvent|None = None):
-        galvo = self.galvo.one_frame(self.settings)[:-self.settings['readout_points']//3]
-        stage = self.stage.one_frame(self.settings, event, next_event)[:-self.settings['readout_points']//3]
-        camera = self.camera.one_frame(self.settings)[:-self.settings['readout_points']//3]
-        aotf = self.aotf.one_frame(self.settings, event)[:, :-self.settings['readout_points']//3]
-        led = self.led.one_frame(self.settings, event)[:, :-self.settings['readout_points']//3]
-        if self.settings['twitchers']:
-            twitcher = self.twitcher.one_frame(self.settings)[:-self.settings['readout_points']//3]
+    def get_data(self, event: useq.MDAEvent, next_event: useq.MDAEvent|None = None, live=False):
+        galvo = self.galvo.one_frame(self.settings['ni'])[:-self.settings['ni']['readout_points']//3]
+        stage = self.stage.one_frame(self.settings['ni'], event, next_event)[:-self.settings['ni']['readout_points']//3]
+        camera = self.camera.one_frame(self.settings['ni'])[:-self.settings['ni']['readout_points']//3]
+        aotf = self.aotf.one_frame(self.settings, event, live)[:, :-self.settings['ni']['readout_points']//3]
+        led = self.led.one_frame(self.settings, event, live)[:, :-self.settings['ni']['readout_points']//3]
+        twitchers = self.settings['ni']['twitchers'] if not live else self.settings['live']['twitchers']
+        if twitchers:
+            twitcher = self.twitcher.one_frame(self.settings['ni'])[:-self.settings['ni']['readout_points']//3]
         else:
             twitcher = np.zeros(galvo.shape)
         return np.vstack([galvo, stage, camera, aotf, led, twitcher])
@@ -120,7 +121,10 @@ class AOTF(DAQDevice):
     def __init__(self):
         self.blank_voltage = 10
 
-    def one_frame(self, settings: dict, event:useq.MDAEvent) -> np.ndarray:
+    def one_frame(self, settings: dict, event:useq.MDAEvent, live=False) -> np.ndarray:
+        if live:
+            settings['ni']['laser_powers'] = settings['live']['ni']['laser_powers']
+        settings = settings['ni']
         n_points = settings['exposure_points']
 
         blank = np.ones(n_points) * self.blank_voltage
@@ -130,7 +134,7 @@ class AOTF(DAQDevice):
         elif event.channel.config == '561':
             aotf_488 = np.zeros(n_points)
             aotf_561 = np.ones(n_points) * settings['laser_powers']['561']/10
-        elif event.channel.config == 'LED':
+        else:
             aotf_488 = np.zeros(n_points)
             aotf_561 = np.zeros(n_points)
             blank = np.zeros(n_points)
@@ -179,15 +183,18 @@ class LED(DAQDevice):
         self.power = 5
         self.speed_adjustment = 0.98
 
-    def one_frame(self, settings: dict, event:useq.MDAEvent, power = None) -> np.ndarray:
-        if event.channel.config != 'LED':
+    def one_frame(self, settings: dict, event:useq.MDAEvent, power = None, live=False) -> np.ndarray:
+        if live:
+            settings['ni']['laser_powers'] = settings['live']['ni']['laser_powers']
+        settings = settings['ni']
+        if event.channel.config.lower() != 'led':
             return np.expand_dims(np.zeros(settings['total_points'] +
                                            settings['readout_points']), 0)
         self.adjusted_readout = (settings['readout_points'] / settings['sample_rate']
                                  * self.speed_adjustment)
         n_points = (settings['total_points'] -
                     round(self.adjusted_readout * settings['sample_rate']))
-        led = np.ones(n_points) * self.power
+        led = np.ones(n_points) * settings['laser_powers']['led']/10
         led = np.expand_dims(led, 0)
         led = self.add_readout(led, settings)
         return led
