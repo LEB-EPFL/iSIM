@@ -5,8 +5,7 @@ from pymmcore_plus import CMMCorePlus
 from useq._time import timedelta
 from useq import MDASequence, TIntervalLoops, ZAboveBelow
 
-mmc = CMMCorePlus().instance()
-mmc.loadSystemConfiguration()
+
 
 if __name__ == "__main__":
     app = QApplication([])

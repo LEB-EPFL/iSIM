@@ -18,7 +18,6 @@ class AcquisitionEngine(MDAEngine):
         self.pre_trigger_delay = 10 #ms
         self.mmc = mmc
         self.settings = settings or iSIMSettings()
-        print("acq settings", self.settings)
         self.device_group = device_group
 
         self.task = nidaqmx.Task()

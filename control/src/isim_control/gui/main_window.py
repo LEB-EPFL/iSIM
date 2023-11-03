@@ -73,10 +73,8 @@ class MainWindow(QMainWindow):
         self.twitchers.toggled.connect(self._twitchers_changed)
         self.twitchers.setChecked(settings['live']['twitchers'])
 
-        self.group_presets = GroupPresetTableWidget()
-
         self.setWindowTitle("MyMDA")
-        self.setLayout(QGridLayout())
+
         self.channelBox.setLayout(QGridLayout())
         self.channelBox.layout().addWidget(self.live_488, 0, 0)
         self.channelBox.layout().addWidget(self.live_561, 1, 0)
@@ -94,8 +92,6 @@ class MainWindow(QMainWindow):
         self.main.layout().addWidget(self.twitchers, 1, 2, 1, 2)
 
         self.main.layout().addWidget(self.channelBox, 0, 1, 3, 1)
-
-        self.main.layout().addWidget(self.group_presets, 5, 0, 1, 3)
 
 
         self.mda_button.pressed.connect(self._mda)
@@ -209,14 +205,12 @@ if __name__ == "__main__":
 
     broker = Broker()
 
-    mmc = CMMCorePlus()
-    print(mmc)
+    mmc = CMMCorePlus.instance()
     settings = iSIMSettings(time_plan = {"interval": 0.2, "loops": 20},)
     settings['twitchers'] = True
 
-
     try:
-        mmc.loadSystemConfiguration("C:/iSIM/Micro-Manager-2.0.2/221130.cfg")
+        mmc.loadSystemConfiguration("C:/iSIM/iSIM/mm-configs/pymmcore_plus.cfg")
         mmc.setCameraDevice("PrimeB_Camera")
         mmc.setProperty("PrimeB_Camera", "TriggerMode", "Edge Trigger")
         mmc.setProperty("PrimeB_Camera", "ReadoutRate", "100MHz 16bit")
@@ -249,18 +243,19 @@ if __name__ == "__main__":
         print("iSIM components could not be loaded.")
         mmc.loadSystemConfiguration()
 
-
     default_settings = copy.deepcopy(settings)
-
 
     #GUI
     frame = MainWindow(Publisher(broker.pub_queue), settings)
     frame.update_from_settings(default_settings)
-    frame.show()
+
+    group_presets = GroupPresetTableWidget(mmcore=mmc)
+    frame.main.layout().addWidget(group_presets, 5, 0, 1, 3)
 
     stages = iSIM_StageWidget(mmc)
+
+    frame.show()
     stages.show()
 
-
-
     app.exec_()
+    broker.stop()

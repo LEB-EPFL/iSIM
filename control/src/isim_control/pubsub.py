@@ -34,6 +34,8 @@ class Broker(Thread):
 
     def stop(self):
         self.stop_requested = True
+        for subscriber in self.subscribers:
+            subscriber.stop()
 
 
 class Publisher():

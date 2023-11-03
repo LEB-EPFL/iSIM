@@ -39,13 +39,11 @@ class iSIMRunner:
             self.mmc.stopSequenceAcquisition()
 
     def _on_settings_change(self, keys, value):
-        print(f"Broker: settings changed {keys} to {value}")
         self.settings.set_by_path(keys, value)
         if "live" in keys:
             self.live_engine.update_settings(self.settings)
         if "acquisition" in keys:
             self.acquisition_engine.update_settings(self.settings)
-
 
     def stop(self):
         self.sub.stop()
