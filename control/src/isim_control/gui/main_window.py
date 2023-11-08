@@ -3,34 +3,38 @@ from qtpy.QtWidgets import (QApplication, QPushButton, QWidget, QGridLayout, QGr
 from qtpy.QtCore import Qt
 
 from pymmcore_widgets import GroupPresetTableWidget, StageWidget
-from superqt import QLabeledSlider
+from superqt import QLabeledSlider, fonticon
 from isim_control.gui.dark_theme import slider_theme
 from isim_control.gui.dark_theme import set_dark
 
-from mda import iSIMMDAWidget
+from isim_control.pubsub import Subscriber, Publisher
+from isim_control.gui.mda import iSIMMDAWidget
 
-import pprint
 import copy
-
+from fonticon_mdi6 import MDI6
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, publisher, settings: dict = {}):
+    def __init__(self, publisher:Publisher, settings: dict = {}):
         super().__init__()
-        self.setWindowTitle("MyMDA")
+        self.pub = publisher
+        self.settings = settings
 
         self.main = QWidget()
         self.setCentralWidget(self.main)
 
-        self.main.setLayout(QGridLayout())
+        self.mda_window = iSIMMDAWidget(settings=self.settings,
+                                        publisher=self.pub)
 
-
-        self.pub = publisher
+        routes = {"acquisition_finished": [lambda: self.mda_window.run_buttons._on_cancel_clicked(True)],
+                  }
+        self.sub = Subscriber(['gui'], routes)
         self.running = False
 
-        self.settings = settings
-
+        self.setWindowTitle("MyMDA")
+        self.main.setLayout(QGridLayout())
         self.live_button = QPushButton("Live")
+        self.live_button.setIcon(fonticon.icon(MDI6.play_circle_outline, color="lime"))
         self.live_button.clicked.connect(self._live)
         self.snap_button = QPushButton("Snap")
         self.mda_button = QPushButton("MDA")
@@ -99,8 +103,9 @@ class MainWindow(QMainWindow):
         self.live_power_561.installEventFilter(self)
         self.live_power_led.installEventFilter(self)
 
+
+
     def _mda(self):
-        self.mda_window = iSIMMDAWidget(settings=self.settings, publisher=self.pub)
         self.mda_window.show()
 
     def _488_activate(self, toggle):
@@ -151,8 +156,12 @@ class MainWindow(QMainWindow):
         print(self.running)
         if not self.running:
             self.pub.publish("gui", "live_button_clicked", [True])
+            self.live_button.setText("Pause")
+            self.live_button.setIcon(fonticon.icon(MDI6.pause_circle_outline, color="red"))
         else:
             self.pub.publish("gui", "live_button_clicked", [False])
+            self.live_button.setText("Live")
+            self.live_button.setIcon(fonticon.icon(MDI6.play_circle_outline, color="lime"))
         self.running = not self.running
 
     def update_from_settings(self, settings: dict):
@@ -206,6 +215,7 @@ if __name__ == "__main__":
     mmc = CMMCorePlus.instance()
     settings = iSIMSettings(time_plan = {"interval": 0.2, "loops": 20},)
     settings['twitchers'] = True
+    isim_devices = devices.NIDeviceGroup(settings=settings)
 
     try:
         mmc.loadSystemConfiguration("C:/iSIM/iSIM/mm-configs/pymmcore_plus.cfg")
@@ -219,7 +229,7 @@ if __name__ == "__main__":
         mmc.setAutoShutter(False)
 
         #Backend
-        isim_devices = devices.NIDeviceGroup(settings=settings)
+
         acq_engine = acquisition.AcquisitionEngine(mmc, isim_devices, settings)
         live_engine = live.LiveEngine(task = acq_engine.task, mmcore=mmc, settings=settings,
                                       device_group=isim_devices)
@@ -237,7 +247,13 @@ if __name__ == "__main__":
         preview = ImagePreview(mmcore=mmc)
         mmc.mda.events.frameReady.connect(preview._on_image_snapped)
         preview.show()
+        stages = iSIM_StageWidget(mmc)
+        stages.show()
     except FileNotFoundError:
+        from unittest.mock import MagicMock
+        runner = iSIMRunner(mmc, MagicMock(), MagicMock(), devices=isim_devices, settings=settings,
+                            publisher=Publisher(broker.pub_queue))
+        broker.attach(runner)
         # Not on the iSIM
         print("iSIM components could not be loaded.")
         mmc.loadSystemConfiguration()
@@ -246,15 +262,14 @@ if __name__ == "__main__":
 
     #GUI
     frame = MainWindow(Publisher(broker.pub_queue), settings)
+    broker.attach(frame)
     frame.update_from_settings(default_settings)
 
     group_presets = GroupPresetTableWidget(mmcore=mmc)
     frame.main.layout().addWidget(group_presets, 5, 0, 1, 3)
 
-    stages = iSIM_StageWidget(mmc)
 
     frame.show()
-    stages.show()
 
     app.exec_()
     broker.stop()

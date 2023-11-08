@@ -39,11 +39,7 @@ class AcquisitionEngine(MDAEngine):
                                                                       )
         self.mmc.mda.events.sequenceFinished.connect(self.on_sequence_end)
         self.mmc.events.exposureChanged.connect(self._exposure_change)
-        # self.mmc.mda.events.frameReady.connect(self.on_frame)
         self.snap_lock = Lock()
-
-    def _exposure_change(self, exposure):
-        print("EXPOSURE CHANGED", exposure)
 
     def setup_event(self, event: MDAEvent):
         try:
@@ -54,12 +50,10 @@ class AcquisitionEngine(MDAEngine):
         thread = Thread(target=self.snap_and_get, args=(event,))
 
         self.snap_lock.acquire()
-
         thread.start()
         try:
             self.task.stop()
         except:
-            #Task probably not running yet
             pass
         self.stream.write_many_sample(self.ni_data)
 
@@ -67,12 +61,10 @@ class AcquisitionEngine(MDAEngine):
         # super().setup_event(event)
 
     def exec_event(self, event: MDAEvent):
-        try:
-            self.snap_lock.acquire()
-            self.task.start()
-        except Exception as e:
-            print(e)
-            print("FAILED TO WRITE NI DATA")
+        # Check that the camera has been asked to snap and start the generation on the DAQ
+        self.snap_lock.acquire()
+        self.task.start()
+
         return ()
 
     def snap_and_get(self, event):
@@ -88,8 +80,6 @@ class AcquisitionEngine(MDAEngine):
         self.task.stop()
         self.snap_lock.release()
 
-        # self.show_timing()
-
     def setup_sequence(self, sequence):
         # Potentially we could set up data for the whole sequence here
         self.sequence = copy.deepcopy(sequence)
@@ -97,13 +87,28 @@ class AcquisitionEngine(MDAEngine):
         next(self.internal_event_iterator)
         self._mmc.setPosition(self.settings['ni']['relative_z'])
 
-        # self.frame_times = np.zeros(sequence.sizes['t'])
+        #
 
     def update_settings(self, settings):
         self.settings = settings
         self.task.timing.cfg_samp_clk_timing(rate=self.settings['ni']['sample_rate'],
                                         samps_per_chan=settings['ni']['total_points'] +
                                         settings['ni']['readout_points']//3*2,)
+
+
+
+class TimedAcquisitionEngine(AcquisitionEngine):
+    def __init__(self, mmc: CMMCorePlus, device_group: NIDeviceGroup = None,
+                 settings: dict|None = None):
+        super().__init__(mmc, device_group, settings)
+
+    def on_sequence_end(self, sequence):
+        self.show_timing()
+        return super().on_sequence_end(sequence)
+
+    def setup_sequence(self, sequence):
+        self.frame_times = np.zeros(sequence.sizes['t'])
+        return super().setup_sequence(sequence)
 
     def on_frame(self, image, event, meta):
         # time_here = datetime.strptime(meta["Time"], '%Y-%m-%d %H:%M:%S.%f')

@@ -3,16 +3,18 @@ from qtpy.QtWidgets import (QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLay
                             QSizePolicy, QGridLayout, QTabBar, QPushButton)
 from qtpy.QtCore import Qt
 
-from superqt import QLabeledSlider
+from superqt import QLabeledSlider, fonticon
 from isim_control.settings_translate import useq_from_settings
 from isim_control.gui.dark_theme import slider_theme
 
+from fonticon_mdi6 import MDI6
 
 class iSIMMDAWidget(MDASequenceWidget):
     def __init__(self, settings:dict, publisher, parent=None):
         self.settings = settings
         self.lasers = LaserPowers(settings)
         self.isim = iSIMSettingsWidget()
+
         self.pub = publisher
         super().__init__(parent=parent)
         self.run_buttons = RunButtons(publisher, self)
@@ -37,19 +39,59 @@ class iSIMMDAWidget(MDASequenceWidget):
             self.settings.set_by_path(key, value)
         return self.settings
 
+
 class RunButtons(QWidget):
     def __init__(self, publisher, parent=None):
         super().__init__(parent)
         self.mda = parent
         self.pub = publisher
-        self.run_button = QPushButton("Run")
-        self.run_button.clicked.connect(self._on_run_clicked)
+        self.pause = False
+
+        self.run_btn = QPushButton("Run")
+        self.run_btn.clicked.connect(self._on_run_clicked)
+        self.run_btn.setIcon(fonticon.icon(MDI6.play_circle_outline, color="lime"))
+        self.pause_btn = QPushButton("Pause")
+        self.pause_btn.clicked.connect(self._on_pause_clicked)
+        self.pause_btn.setIcon(fonticon.icon(MDI6.pause_circle_outline, color="green"))
+        self.pause_btn.hide()
+        self.cancel_btn = QPushButton("Stop")
+        self.cancel_btn.clicked.connect(self._on_cancel_clicked)
+        self.cancel_btn.setIcon(fonticon.icon(MDI6.stop_circle_outline, color="magenta"))
+        self.cancel_btn.hide()
+
         self.setLayout(QHBoxLayout())
-        self.layout().addWidget(self.run_button)
+        self.layout().addWidget(self.run_btn)
+        self.layout().addWidget(self.pause_btn)
+        self.layout().addWidget(self.cancel_btn)
 
     def _on_run_clicked(self) -> None:
         self.pub.publish("gui", "settings_change", [[], self.mda.get_settings()])
-        self.pub.publish("gui", "acquisition_button_clicked", [True])
+        self.pub.publish("gui", "acquisition_start", [True])
+        self.run_btn.hide()
+        self.pause_btn.show()
+        self.cancel_btn.show()
+        self.pause = False
+
+    def _on_pause_clicked(self) -> None:
+        self.pause = not self.pause
+        self.pub.publish("gui", "acquisition_pause", [self.pause])
+        if self.pause:
+            self.pause_btn.setIcon(fonticon.icon(MDI6.play_circle_outline, color="lime"))
+            self.pause_btn.setText("Resume")
+        else:
+            self.pause_btn.setIcon(fonticon.icon(MDI6.pause_circle_outline, color="green"))
+            self.pause_btn.setText("Pause")
+
+    def _on_cancel_clicked(self, silent=False) -> None:
+        if not silent:
+            self.pub.publish("gui", "acquisition_cancel")
+        self.run_btn.show()
+        self.pause_btn.hide()
+        self.pause_btn.setIcon(fonticon.icon(MDI6.pause_circle_outline, color="green"))
+        self.pause_btn.setText("Pause")
+        self.cancel_btn.hide()
+        self.pause = False
+
 
 class LaserPowers(QWidget):
     def __init__(self, settings: dict, parent=None):

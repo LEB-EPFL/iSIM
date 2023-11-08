@@ -35,14 +35,15 @@ class Broker(Thread):
     def stop(self):
         self.stop_requested = True
         for subscriber in self.subscribers:
-            subscriber.stop()
+            subscriber.sub.stop()
 
 
 class Publisher():
     def __init__(self, pub_queue: multiprocessing.Queue):
         self.pub_queue = pub_queue
 
-    def publish(self, topic, message, values: list):
+    def publish(self, topic, message, values: list = None):
+        values = [] if values is None else values
         return self.pub_queue.put({"topic": topic,
                                    "event": message,
                                    "values": values})
