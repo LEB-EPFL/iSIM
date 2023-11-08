@@ -1,5 +1,3 @@
-
-
 from qtpy.QtWidgets import (QApplication, QPushButton, QWidget, QGridLayout, QGroupBox,
                             QRadioButton, QSpinBox, QLabel, QCheckBox, QMainWindow)
 from qtpy.QtCore import Qt
@@ -151,7 +149,7 @@ class MainWindow(QMainWindow):
 
     def _live(self):
         print(self.running)
-        if self.running:
+        if not self.running:
             self.pub.publish("gui", "live_button_clicked", [True])
         else:
             self.pub.publish("gui", "live_button_clicked", [False])
@@ -216,12 +214,13 @@ if __name__ == "__main__":
         mmc.setProperty("PrimeB_Camera", "ReadoutRate", "100MHz 16bit")
         mmc.setProperty("Sapphire", "State", 1)
         mmc.setProperty("Quantum_561nm", "Laser Operation", "On")
+        mmc.setChannelGroup("Channel")
         mmc.setExposure(129)
         mmc.setAutoShutter(False)
 
         #Backend
         isim_devices = devices.NIDeviceGroup(settings=settings)
-        acq_engine = acquisition.AcquisitionEngine(mmc, isim_devices)
+        acq_engine = acquisition.AcquisitionEngine(mmc, isim_devices, settings)
         live_engine = live.LiveEngine(task = acq_engine.task, mmcore=mmc, settings=settings,
                                       device_group=isim_devices)
         mmc.mda.set_engine(acq_engine)

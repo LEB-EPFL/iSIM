@@ -20,13 +20,11 @@ class iSIMRunner:
         self.acquisition_engine = acquisition_engine
         self.devices = devices
 
-        #TODO: remove this
-        self.settings["acquisition"]["time_plan"] = {"interval": 0.5, "loops": 5}
 
     def _on_acquisition_started(self, toggled):
         print(f"Broker: acquisition toggled {toggled}")
         if toggled:
-            self.devices.update_settings(self.settings['ni'])
+            self.devices.update_settings(self.settings)
             self.acquisition_engine.update_settings(self.settings)
             self.mmc.run_mda(useq_from_settings(self.settings))
 
@@ -34,16 +32,16 @@ class iSIMRunner:
         print(f"Broker: live toggled {toggled}")
         if toggled:
             self.live_engine.update_settings(self.settings)
-            self.mmc.startContinuousSequenceAcquisition()
+            self.live_engine._on_sequence_started()
+            # self.mmc.startContinuousSequenceAcquisition()
         else:
-            self.mmc.stopSequenceAcquisition()
+            self.live_engine._on_sequence_stopped()
+            # self.mmc.stopSequenceAcquisition()
 
     def _on_settings_change(self, keys, value):
         self.settings.set_by_path(keys, value)
-        if "live" in keys:
-            self.live_engine.update_settings(self.settings)
-        if "acquisition" in keys:
-            self.acquisition_engine.update_settings(self.settings)
+        self.live_engine.update_settings(self.settings)
+        self.acquisition_engine.update_settings(self.settings)
 
     def stop(self):
         self.sub.stop()

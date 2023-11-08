@@ -25,6 +25,7 @@ class NIDeviceGroup():
             twitcher = self.twitcher.one_frame(self.settings['ni'])[:-self.settings['ni']['readout_points']//3]
         else:
             twitcher = np.ones(galvo.shape)*5
+        led[0, -1:] = np.ones(1)*6
         return np.vstack([galvo, stage, camera, aotf, led, twitcher])
 
     def update_settings(self, settings: dict):
@@ -32,9 +33,9 @@ class NIDeviceGroup():
 
 
 def makePulse(start, end, offset, n_points):
-    DutyCycle=10/n_points
-    up = np.ones(round(DutyCycle*n_points))*start
-    down = np.ones(n_points-round(DutyCycle*n_points))*end
+    duty_cycle = 10/n_points
+    up = np.ones(round(duty_cycle*n_points))*start
+    down = np.ones(n_points-round(duty_cycle*n_points))*end
     pulse = np.concatenate((up,down)) + offset
     return pulse
 
@@ -100,20 +101,21 @@ class Twitcher(DAQDevice):
         # This might be nice, because it might be a second task that runs at a higher frequency
         # if that's possible
 
-        n_points = settings['total_points']
-        frame_time =  settings['total_points'] / settings['sample_rate'] # seconds
-        wavelength = 1/self.freq  # seconds
-        n_waves = frame_time/wavelength
-        points_per_wave = int(np.ceil(n_points/n_waves))
+        wavelength = 1/self.freq*settings["sample_rate"]  # seconds
+        n_waves = (settings['exposure_points'])/wavelength
+        points_per_wave = int(np.ceil(settings['exposure_points']/n_waves))
         up = np.linspace(-1, 1, points_per_wave//2 + 1)
         down = np.linspace(1, -1, points_per_wave//2 + 1)
-        frame = np.hstack((down[:-1], np.tile(np.hstack((up[:-1], down[:-1])), round(n_waves + 20)), up[:-1]))
-        frame = ndimage.gaussian_filter1d(frame, points_per_wave/20)
-        frame = frame[points_per_wave//2:n_points + points_per_wave//2]
-        frame = frame*(self.amp/frame.max()) + self.offset
-        frame = np.hstack([np.ones(settings['readout_points']//2)*frame[-1],
+        start = np.linspace(0, -1, points_per_wave//4 + 1)
+        end = np.linspace(-1, 0, points_per_wave//4 + 1)
+        frame = np.hstack((start[:-1], np.tile(np.hstack((up[:-1], down[:-1])), round(n_waves + 20)), end))
+        missing_points = settings['total_points'] + settings['readout_points'] - frame.shape[0]
+        frame = np.hstack([np.ones(int(np.floor(missing_points/2)))*frame[0],
                            frame,
-                           np.ones(settings['readout_points']//2)*frame[-1]])
+                           np.ones(int(np.ceil(missing_points/2)))*frame[-1]])
+
+        frame = ndimage.gaussian_filter1d(frame, points_per_wave/20)
+        frame = frame*(self.amp/frame.max()) + self.offset
         return frame
 
 
@@ -208,8 +210,22 @@ class LED(DAQDevice):
         return frame
 
 
-def main():
-    pass
+def main(settings: dict = None, data: np.ndarray = None):
+    if data is None:
+        from isim_control.settings import iSIMSettings
+        from isim_control.settings_translate import useq_from_settings
+        if not settings:
+            settings = iSIMSettings()
+            settings['ni']['twitchers'] = True
+        devices = NIDeviceGroup(settings)
+        seq = useq_from_settings(settings)
+
+        data = devices.get_data(next(seq.iter_events()))
+    import matplotlib.pyplot as plt
+    for device in data:
+        plt.step(np.arange(len(device))/settings['ni']['sample_rate'], device)
+    plt.legend(np.arange(data.shape[0]))
+    plt.show()
 
 if __name__ == "__main__":
     main()

@@ -1,24 +1,24 @@
 from pymmcore_widgets.useq_widgets._mda_sequence import MDASequenceWidget
-from qtpy.QtWidgets import (QApplication, QWidget, QLabel, QVBoxLayout, QCheckBox, QSizePolicy,
-                            QGridLayout, QTabBar)
+from qtpy.QtWidgets import (QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QCheckBox,
+                            QSizePolicy, QGridLayout, QTabBar, QPushButton)
 from qtpy.QtCore import Qt
-from pymmcore_plus import CMMCorePlus
-from superqt import QLabeledSlider
-import pprint
-from isim_control.settings_translate import useq_from_settings
 
-# mmc = CMMCorePlus()
-# mmc.loadSystemConfiguration()
+from superqt import QLabeledSlider
+from isim_control.settings_translate import useq_from_settings
+from isim_control.gui.dark_theme import slider_theme
 
 
 class iSIMMDAWidget(MDASequenceWidget):
     def __init__(self, settings:dict, publisher, parent=None):
         self.settings = settings
         self.lasers = LaserPowers(settings)
-        self.isim = iSIMSettingsTab()
+        self.isim = iSIMSettingsWidget()
         self.pub = publisher
         super().__init__(parent=parent)
+        self.run_buttons = RunButtons(publisher, self)
+        self.layout().addWidget(self.lasers)
         self.layout().addWidget(self.isim)
+        self.layout().addWidget(self.run_buttons)
         super().setValue(useq_from_settings(settings))
 
     def setValue(self, settings: dict):
@@ -33,14 +33,23 @@ class iSIMMDAWidget(MDASequenceWidget):
         self.settings['ni']['laser_powers']['488'] = self.lasers.power_488.value()
         self.settings['ni']['laser_powers']['561'] = self.lasers.power_561.value()
         isim_settings = self.isim.get_state()
-        for key,value in isim_settings.items():
-            self.settings[key] = value
+        for key,value in isim_settings:
+            self.settings.set_by_path(key, value)
         return self.settings
 
-    def _on_run_clicked(self) -> None:
-        pprint.pprint(self.get_settings())
-        self.pub.publish("gui", "acquisition_button_clicked", [True])
+class RunButtons(QWidget):
+    def __init__(self, publisher, parent=None):
+        super().__init__(parent)
+        self.mda = parent
+        self.pub = publisher
+        self.run_button = QPushButton("Run")
+        self.run_button.clicked.connect(self._on_run_clicked)
+        self.setLayout(QHBoxLayout())
+        self.layout().addWidget(self.run_button)
 
+    def _on_run_clicked(self) -> None:
+        self.pub.publish("gui", "settings_change", [[], self.mda.get_settings()])
+        self.pub.publish("gui", "acquisition_button_clicked", [True])
 
 class LaserPowers(QWidget):
     def __init__(self, settings: dict, parent=None):
@@ -48,18 +57,18 @@ class LaserPowers(QWidget):
         self.power_488 = QLabeledSlider(Qt.Orientation.Horizontal)
         self.power_488.setRange(0, 100)
         self.power_488.setValue(settings['ni']['laser_powers']['488'])
+        self.power_488.setStyleSheet(slider_theme("#00f7ff"))
         self.power_561 = QLabeledSlider(Qt.Orientation.Horizontal)
         self.power_561.setRange(0, 100)
         self.power_561.setValue(settings['ni']['laser_powers']['561'])
-        self.power_561.setStyleSheet(
-            "QSlider::handle:horizontal:enabled {background-color: green;}")
+        self.power_561.setStyleSheet(slider_theme("#c6ff00"))
 
         self.setLayout(QVBoxLayout())
         self.layout().addWidget(self.power_488)
         self.layout().addWidget(self.power_561)
 
 
-class iSIMSettingsTab(QWidget):
+class iSIMSettingsWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -87,10 +96,11 @@ class iSIMSettingsTab(QWidget):
         self.filters.setChecked(settings['use_filters'])
 
     def get_state(self):
-        return {
-            "twitchers": self.twitchers.isChecked(),
-            "use_filters": self.filters.isChecked(),
-        }
+        return (
+            [["twitchers"], self.twitchers.isChecked()],
+            [["ni", "twitchers"], self.twitchers.isChecked()],
+            [["use_filters"], self.filters.isChecked()])
+
 
 
 if __name__ == "__main__":

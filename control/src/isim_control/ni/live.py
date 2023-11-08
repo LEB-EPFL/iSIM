@@ -6,6 +6,7 @@ from threading import Timer
 import time
 from isim_control.ni.devices import NIDeviceGroup
 from useq import MDAEvent
+from threading import Thread, Lock
 
 CONTINUOUS = nidaqmx.constants.AcquisitionType.CONTINUOUS
 
@@ -32,29 +33,28 @@ class LiveEngine():
             self.task.ao_channels.add_ao_voltage_chan('Dev1/ao6') # LED channel
             self.task.ao_channels.add_ao_voltage_chan('Dev1/ao7') # twitcher channel
             self.task.timing.cfg_samp_clk_timing(rate=self.settings['ni']['sample_rate'],
-                                                 sample_mode=CONTINUOUS)
+                                                 samps_per_chan=settings['ni']['total_points'] +
+                                                 settings['ni']['readout_points']//3*2)
         else:
             self.task = task
 
-        self._mmc.events.continuousSequenceAcquisitionStarted.connect(
-            self._on_sequence_started
-        )
-        self._mmc.events.sequenceAcquisitionStopped.connect(self._on_sequence_stopped)
+        # self._mmc.events.continuousSequenceAcquisitionStarted.connect(
+        #     self._on_sequence_started
+        # )
+        # self._mmc.events.sequenceAcquisitionStopped.connect(self._on_sequence_stopped)
 
     def _on_sequence_started(self):
-        self.task.start()
-        self.timer = LiveTimer(1/self.fps, self.settings, self.task, self.devices)
+        "STARTING LIVE"
+        self.timer = LiveTimer(1/self.fps, self.settings, self.task, self.devices, self._mmc)
         self.timer.start()
 
     def _on_sequence_stopped(self):
         try:
-            self.timer.cancel()
+            self.timer.request_cancel()
             self.timer = None
         except:
             print("Acquisition not yet started")
-        self.task.write(np.zeros(self.task.number_of_channels))
-        time.sleep(0.5)
-        self.task.stop()
+
 
     def update_settings(self, settings):
         self.settings = settings['live']
@@ -65,15 +65,39 @@ class LiveEngine():
 
 
 class LiveTimer(Timer):
-    def __init__(self, interval:float, settings: dict, task: nidaqmx.Task, devices: NIDeviceGroup):
+    def __init__(self, interval:float, settings: dict, task: nidaqmx.Task, devices: NIDeviceGroup,
+                 mmcore: CMMCorePlus):
         super().__init__(interval, None)
         self.settings = settings
         self.task = task
         self.devices = devices
+        self._mmc = mmcore
+        self.cancel_requested = False
+
+        self.snap_lock = Lock()
 
     def run(self):
         while not self.finished.wait(self.interval):
+            self.snap_lock.acquire()
+            thread = Thread(target=self.snap_and_get,)
+            thread.start()
             self.task.write(self.one_frame())
+            self.task.start()
+            self.task.wait_until_done()
+            self.snap_lock.acquire()
+            self.task.stop()
+            if self.cancel_requested:
+                break
+
+    def snap_and_get(self,):
+        self.snap_lock.release()
+        self._mmc.snapImage()
+        self._mmc.mda.events.frameReady.emit(self._mmc.getImage(fix=False), None,
+                                             self._mmc.getTags())
+        self.snap_lock.release()
+
+    def request_cancel(self):
+        self.cancel_requested = True
 
     def one_frame(self):
         event = MDAEvent(channel={'config':self.settings['channel']})
