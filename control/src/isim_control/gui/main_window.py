@@ -207,6 +207,7 @@ if __name__ == "__main__":
     from isim_control.runner import iSIMRunner
     from isim_control.ni import live, acquisition, devices
     from pymmcore_plus import CMMCorePlus
+    monogram = False
     app = QApplication([])
     set_dark(app)
 
@@ -218,45 +219,49 @@ if __name__ == "__main__":
     isim_devices = devices.NIDeviceGroup(settings=settings)
 
     try:
+        from isim_control.io.monogram import MonogramCC
         mmc.loadSystemConfiguration("C:/iSIM/iSIM/mm-configs/pymmcore_plus.cfg")
         mmc.setCameraDevice("PrimeB_Camera")
         mmc.setProperty("PrimeB_Camera", "TriggerMode", "Edge Trigger")
         mmc.setProperty("PrimeB_Camera", "ReadoutRate", "100MHz 16bit")
         mmc.setProperty("Sapphire", "State", 1)
         mmc.setProperty("Quantum_561nm", "Laser Operation", "On")
+        mmc.setProperty("MCL NanoDrive Z Stage", "Settling time (ms)", 30)
         mmc.setChannelGroup("Channel")
         mmc.setExposure(129)
         mmc.setAutoShutter(False)
 
         #Backend
-
         acq_engine = acquisition.AcquisitionEngine(mmc, isim_devices, settings)
-        live_engine = live.LiveEngine(task = acq_engine.task, mmcore=mmc, settings=settings,
+        live_engine = live.LiveEngine(task=acq_engine.task, mmcore=mmc, settings=settings,
                                       device_group=isim_devices)
         mmc.mda.set_engine(acq_engine)
 
-        runner = iSIMRunner(mmc,
-                        live_engine=live_engine,
-                        acquisition_engine=acq_engine,
-                        devices=isim_devices,
-                        settings = settings)
-
-        broker.attach(runner)
-
-        from pymmcore_widgets import ImagePreview
-        preview = ImagePreview(mmcore=mmc)
-        mmc.mda.events.frameReady.connect(preview._on_image_snapped)
-        preview.show()
+        monogram = MonogramCC(mmcore=mmc)
         stages = iSIM_StageWidget(mmc)
         stages.show()
     except FileNotFoundError:
         from unittest.mock import MagicMock
-        runner = iSIMRunner(mmc, MagicMock(), MagicMock(), devices=isim_devices, settings=settings,
-                            publisher=Publisher(broker.pub_queue))
-        broker.attach(runner)
+        acq_engine = MagicMock()
+        live_engine = MagicMock()
         # Not on the iSIM
         print("iSIM components could not be loaded.")
         mmc.loadSystemConfiguration()
+
+
+
+    from pymmcore_widgets import ImagePreview
+    preview = ImagePreview(mmcore=mmc)
+    mmc.mda.events.frameReady.connect(preview._on_image_snapped)
+    preview.show()
+
+    runner = iSIMRunner(mmc,
+                        live_engine=live_engine,
+                        acquisition_engine=acq_engine,
+                        devices=isim_devices,
+                        settings = settings,
+                        publisher=Publisher(broker.pub_queue))
+    broker.attach(runner)
 
     default_settings = copy.deepcopy(settings)
 
@@ -273,3 +278,6 @@ if __name__ == "__main__":
 
     app.exec_()
     broker.stop()
+
+    if monogram:
+        monogram.stop()

@@ -38,7 +38,6 @@ class AcquisitionEngine(MDAEngine):
                                                                       auto_start=False,
                                                                       )
         self.mmc.mda.events.sequenceFinished.connect(self.on_sequence_end)
-        self.mmc.events.exposureChanged.connect(self._exposure_change)
         self.snap_lock = Lock()
 
     def setup_event(self, event: MDAEvent):

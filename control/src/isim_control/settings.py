@@ -22,7 +22,7 @@ class iSIMSettings(dict):
         grid_plan: dict = None,
         camera_name: str = "Prime",
         camera_readout_time: float = 0.029,
-        ni_sample_rate: int = 60_060,
+        ni_sample_rate: int = 60_066,
                  ):
         super().__init__()
         self['use_filters'] = use_filters
@@ -80,8 +80,7 @@ class iSIMSettings(dict):
             self.get_by_path(items[:-1])[items[-1]] = value
         else:
             self.update(value)
-        print("SET_BY_PATH", self['acquisition'])
-        print("SET_BY_PATH", self['ni'])
+
 
 if __name__ == "__main__":
     from isim_control.ni.devices import NIDeviceGroup, main

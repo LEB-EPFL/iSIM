@@ -25,7 +25,7 @@ class NIDeviceGroup():
             twitcher = self.twitcher.one_frame(self.settings['ni'])[:-self.settings['ni']['readout_points']//3]
         else:
             twitcher = np.ones(galvo.shape)*5
-        led[0, -1:] = np.ones(1)*6
+        # led[0, -1:] = np.ones(1)*6
         return np.vstack([galvo, stage, camera, aotf, led, twitcher])
 
     def update_settings(self, settings: dict):

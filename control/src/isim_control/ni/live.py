@@ -38,10 +38,6 @@ class LiveEngine():
         else:
             self.task = task
 
-        # self._mmc.events.continuousSequenceAcquisitionStarted.connect(
-        #     self._on_sequence_started
-        # )
-        # self._mmc.events.sequenceAcquisitionStopped.connect(self._on_sequence_stopped)
 
     def _on_sequence_started(self):
         "STARTING LIVE"
@@ -78,8 +74,9 @@ class LiveTimer(Timer):
 
     def run(self):
         while not self.finished.wait(self.interval):
+            print("live_running")
             self.snap_lock.acquire()
-            thread = Thread(target=self.snap_and_get,)
+            thread = Thread(target=self.snap_and_get)
             thread.start()
             self.task.write(self.one_frame())
             self.task.start()
@@ -87,9 +84,10 @@ class LiveTimer(Timer):
             self.snap_lock.acquire()
             self.task.stop()
             if self.cancel_requested:
+
                 break
 
-    def snap_and_get(self,):
+    def snap_and_get(self):
         self.snap_lock.release()
         self._mmc.snapImage()
         self._mmc.mda.events.frameReady.emit(self._mmc.getImage(fix=False), None,
@@ -102,7 +100,11 @@ class LiveTimer(Timer):
     def one_frame(self):
         event = MDAEvent(channel={'config':self.settings['channel']})
         next_event = event
-        return self.devices.get_data(event, next_event, live=True)
+        ni_data = self.devices.get_data(event, next_event, live=True)
+        return ni_data
+        # ni_data_no_z = np.delete(ni_data, [1], axis=0)
+        # print(ni_data_no_z.shape)
+        # return np.delete(ni_data, [1], axis=0)
 
 
 
