@@ -7,5 +7,5 @@ isimgui.code-workspace
 Tests
 .vscode
 isim
-.venv/
+.venv*/
 **/*.egg-info/

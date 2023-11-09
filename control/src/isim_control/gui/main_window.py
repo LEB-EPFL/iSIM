@@ -272,12 +272,15 @@ if __name__ == "__main__":
 
     group_presets = GroupPresetTableWidget(mmcore=mmc)
     frame.main.layout().addWidget(group_presets, 5, 0, 1, 3)
-
-
     frame.show()
 
+    from isim_control.gui.output import OutputGUI
+    output = OutputGUI(mmc)
+    broker.attach(output)
+    print("MAIN MMCORE", mmc)
     app.exec_()
     broker.stop()
+
 
     if monogram:
         monogram.stop()

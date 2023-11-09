@@ -11,6 +11,7 @@ def add_settings_from_core(mmcore: CMMCorePlus, settings: iSIMSettings):
 
 
 def useq_from_settings(settings: iSIMSettings):
+    print(settings['acquisition'])
     return MDASequence(**settings['acquisition'])
 
 

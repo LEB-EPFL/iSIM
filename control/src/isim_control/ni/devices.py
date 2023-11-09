@@ -1,7 +1,25 @@
-from isimgui.hardware._devices import DAQDevice
+from matplotlib import pyplot as plt
+from typing import Protocol
 import numpy as np
 from scipy import ndimage
 import useq
+
+class DAQDevice(Protocol):
+    """A device that can be controlled with data from an NIDAQ card."""
+
+    def set_daq_settings(self, settings: dict) -> None:
+        """Set sampling_rate and cycle time."""
+
+    def one_frame(self, settings: dict) -> np.ndarray:
+        """Return one frame that fits to the settings passed in."""
+
+    def plot(self):
+        """Plot the daq_data for one frame with matplotlib."""
+        daq_data = self.one_frame(self.settings)
+        x = np.divide(list(range(daq_data.shape[1])),self.settings.final_sample_rate/1000)
+        for channel in range(daq_data.shape[0]):
+            plt.step(x, daq_data[channel,:])
+
 
 class NIDeviceGroup():
     def __init__(self, settings: dict = None):

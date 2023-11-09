@@ -6,5 +6,17 @@ authors = [
     { name = "Willi Stepp", email = "willi.stepp@epfl.ch" }
 ]
 
+dependencies = [
+    'pymmcore-plus',
+    'pymmcore-widgets',
+    'superqt[cmap]',
+    'scipy',
+    'vispy',
+    'pygame'
+]
+
+[project.optional-dependencies]
+display = [ 'vispy' ]
+
 [tool.coverage.run]
 source = ['isim_control']
