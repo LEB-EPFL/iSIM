@@ -38,6 +38,9 @@ class iSIMSettings(dict):
         self['camera']['name'] = camera_name
         self['camera']['readout_time'] = camera_readout_time
 
+        self['save'] = True
+        self['path'] = "C:/Users/stepp/Desktop/MyTIFF.ome.tiff"
+
         self['ni'] = {}
         self['ni']['twitchers'] = twitchers
         self['ni']['relative_z'] = relative_z

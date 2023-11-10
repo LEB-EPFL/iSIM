@@ -37,6 +37,7 @@ flowchart TD;
     exec_event --> nidaqmx
     nidaqmx --> NIDAQ
     snap --> StackViewer
+    snap --> OMETiffWriter
 
 
     %% Live Mode

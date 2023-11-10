@@ -1,12 +1,15 @@
 from pymmcore_plus import CMMCorePlus
 from pymmcore_widgets._mda._stack_viewer import StackViewer
 from pymmcore_widgets._mda._datastore import QLocalDataStore
+from useq import MDASequence
 
 from isim_control.settings import iSIMSettings
 from isim_control.settings_translate import useq_from_settings
 from isim_control.pubsub import Subscriber
+from isim_control.io.ome_tiff_writer import OMETiffWriter
+
 from qtpy.QtCore import QObject, Signal
-from qtpy.QtWidgets import QApplication
+
 
 
 
@@ -29,13 +32,18 @@ class OutputGUI(QObject):
         self.acquisition_started.emit()
 
     def make_viewer(self):
-        sizes = useq_from_settings(self.settings).sizes
+        sequence: MDASequence = useq_from_settings(self.settings)
+        sizes = sequence.sizes
         shape = [sizes.get('t', 1),
                     sizes.get('z', 1),
                     sizes.get('c', 1),
                     self.mmc.getImageHeight(),
                     self.mmc.getImageWidth()]
         self.datastore = QLocalDataStore(shape, mmcore=self.mmc)
+        if self.settings['save']:
+            self.writer = OMETiffWriter(self.settings['path'])
+        self.writer.sequenceStarted(sequence)
+        self.mmc.mda.events.frameReady.connect(self.writer.frameReady)
         self.viewer = StackViewer(datastore=self.datastore, mmcore=self.mmc,
                                   sequence=useq_from_settings(self.settings))
         self.viewer.show()

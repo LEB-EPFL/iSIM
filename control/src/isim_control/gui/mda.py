@@ -1,6 +1,6 @@
 from pymmcore_widgets.useq_widgets._mda_sequence import MDASequenceWidget
 from qtpy.QtWidgets import (QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QCheckBox,
-                            QSizePolicy, QGridLayout, QTabBar, QPushButton)
+                            QSizePolicy, QGridLayout, QLineEdit, QPushButton)
 from qtpy.QtCore import Qt
 
 from superqt import QLabeledSlider, fonticon
@@ -14,12 +14,15 @@ class iSIMMDAWidget(MDASequenceWidget):
         self.settings = settings
         self.lasers = LaserPowers(settings)
         self.isim = iSIMSettingsWidget()
+        self.save_settings = SaverWidget()
+        self.save_settings.set_state(settings)
 
         self.pub = publisher
         super().__init__(parent=parent)
         self.run_buttons = RunButtons(publisher, self)
         self.layout().addWidget(self.lasers)
         self.layout().addWidget(self.isim)
+        self.layout().addWidget(self.save_settings)
         self.layout().addWidget(self.run_buttons)
         super().setValue(useq_from_settings(settings))
 
@@ -27,6 +30,7 @@ class iSIMMDAWidget(MDASequenceWidget):
         seq = useq_from_settings(settings)
         super().setValue(seq)
         self.isim.set_state(settings)
+        self.save_settings.set_state(settings)
         self.lasers.power_488.setValue(settings['ni']['laser_powers']['488'])
         self.lasers.power_561.setValue(settings['ni']['laser_powers']['561'])
 
@@ -36,6 +40,9 @@ class iSIMMDAWidget(MDASequenceWidget):
         self.settings['ni']['laser_powers']['561'] = self.lasers.power_561.value()
         isim_settings = self.isim.get_state()
         for key,value in isim_settings:
+            self.settings.set_by_path(key, value)
+        save_settings = self.save_settings.get_state()
+        for key,value in save_settings:
             self.settings.set_by_path(key, value)
         return self.settings
 
@@ -144,6 +151,23 @@ class iSIMSettingsWidget(QWidget):
             [["use_filters"], self.filters.isChecked()])
 
 
+class SaverWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setLayout(QGridLayout())
+        self.save = QCheckBox("Save to:")
+        self.layout().addWidget(self.save)
+        self.path = QLineEdit("C:/Users/stepp/Desktop/OMETIFF.ome.tiff")
+        self.layout().addWidget(self.path)
+
+    def get_state(self):
+        return (
+            [["save"], self.save.isChecked()],
+            [["path"], self.path.text()])
+
+    def set_state(self, settings: dict):
+        self.save.setChecked(settings['save'])
+        self.path.setText(settings['path'])
 
 if __name__ == "__main__":
 

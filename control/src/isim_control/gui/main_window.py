@@ -277,7 +277,11 @@ if __name__ == "__main__":
     from isim_control.gui.output import OutputGUI
     output = OutputGUI(mmc)
     broker.attach(output)
-    print("MAIN MMCORE", mmc)
+
+    # from isim_control.gui.position_history import PositionHistory
+    # history = PositionHistory(mmc)
+    # history.show()
+
     app.exec_()
     broker.stop()
 

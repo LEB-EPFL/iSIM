@@ -1,4 +1,5 @@
 from pymmcore_plus import CMMCorePlus
+from pymmcore_plus.mda import mda_listeners_connected
 from isim_control.pubsub import Subscriber, Publisher
 from isim_control.settings import iSIMSettings
 from isim_control.ni import live, acquisition, devices
@@ -38,6 +39,7 @@ class iSIMRunner:
         print(f"Broker: acquisition toggled {toggled}")
         self.devices.update_settings(self.settings)
         self.acquisition_engine.update_settings(self.settings)
+
         self.mmc.run_mda(useq_from_settings(self.settings))
 
     def _on_live_toggle(self, toggled):
