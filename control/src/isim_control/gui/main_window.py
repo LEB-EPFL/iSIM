@@ -262,7 +262,7 @@ if __name__ == "__main__":
     preview = ImagePreview(mmcore=mmc)
     mmc.mda.events.frameReady.connect(preview._on_image_snapped)
     preview.show()
-
+    print(mmc)
     runner = iSIMRunner(mmc,
                         live_engine=live_engine,
                         acquisition_engine=acq_engine,
@@ -280,6 +280,7 @@ if __name__ == "__main__":
 
     group_presets = GroupPresetTableWidget(mmcore=mmc)
     frame.main.layout().addWidget(group_presets, 5, 0, 1, 3)
+    group_presets.show() # needed to keep events alive?
     frame.show()
 
     from isim_control.gui.output import OutputGUI

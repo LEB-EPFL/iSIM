@@ -6,7 +6,7 @@ from threading import Timer
 import time
 from isim_control.ni.devices import NIDeviceGroup
 from useq import MDAEvent
-from threading import Thread, Lock
+from threading import Thread, Lock, Event
 
 CONTINUOUS = nidaqmx.constants.AcquisitionType.CONTINUOUS
 
@@ -49,12 +49,18 @@ class LiveEngine():
             self.timer.request_cancel()
             self.timer = None
         except:
-            print("Acquisition not yet started")
+            #print("Acquisition not yet started")
 
     def restart(self):
         if self.timer:
-            print("Restart live")
-            self.timer.crash()
+            #print("Restart live")
+            if self.timer.running:
+                #print("LiveTimer still running")
+                self.timer.request_cancel()
+                Timer(0.3, self.restart).start()
+                return
+            self.timer = None
+            #print("Now restarting")
             self.timer = LiveTimer(1/self.fps, self.settings, self.task, self.devices, self._mmc)
             self.timer.start()
 
@@ -74,46 +80,74 @@ class LiveTimer(Timer):
         self.task = task
         self.devices = devices
         self._mmc = mmcore
-        self.cancel_requested = False
+        self.running = False
+        self.snapping = False
 
         self.snap_lock = Lock()
+        self.stop_event = Event()
+        self.snapping = Event()
 
     def run(self):
+        self.running = True
         while not self.finished.wait(self.interval):
-            print("live_running")
+            if self.stop_event.is_set():
+                break
             self.snap_lock.acquire()
+            #print("live_running")
             thread = Thread(target=self.snap_and_get)
             thread.start()
             self.task.write(self.one_frame())
+            self.snap_lock.acquire()
+            #print(time.perf_counter(), "Send trigger")
             self.task.start()
             self.task.wait_until_done()
-            self.snap_lock.acquire()
             self.task.stop()
-            if self.cancel_requested:
+            if self.stop_event.is_set():
                 break
+
+        #print("Waiting for THREAD")
+        thread.join(1)
+        #we resend the data in case the camera has not finished
+        while self.snapping.is_set():
+            #print("Rewriting clean up data")
+            self.task.write(self.one_frame(clean_up=True))
+            self.task.start()
+            self.task.wait_until_done()
+            self.task.stop()
+        #print("Live TIMER DONE")
+        self.running = False
 
     def snap_and_get(self):
         self.snap_lock.release()
-        self._mmc.snapImage()
-        self._mmc.mda.events.frameReady.emit(self._mmc.getImage(fix=False), None,
-                                             self._mmc.getTags())
+        #print(time.perf_counter(), "SNAP")
+        try:
+            self.snapping.set()
+            self._mmc.snapImage()
+            self.snapping.clear()
+            self._mmc.mda.events.frameReady.emit(self._mmc.getImage(fix=False), None,
+                                                 self._mmc.getTags())
+        except Exception as e:
+            #print(e)
+            self.request_cancel()
+        #print(time.perf_counter(), "SNAPPED")
         self.snap_lock.release()
 
     def request_cancel(self):
-        self.cancel_requested = True
+        self.stop_event.set()
 
-    def crash(self):
-        self.task.stop()
-        self.cancel_requested = True
-        self.snap_lock.release()
-
-    def one_frame(self):
+    def one_frame(self, clean_up=False):
         event = MDAEvent(channel={'config':self.settings['channel']})
         next_event = event
         ni_data = self.devices.get_data(event, next_event, live=True)
-        return ni_data
+        if not clean_up:
+            return ni_data
+        else:
+            #print(ni_data.shape)
+            ni_data[-2, :] = np.zeros(ni_data.shape[1])
+            ni_data[3, :] = np.zeros(ni_data.shape[1])
+            return ni_data
         # ni_data_no_z = np.delete(ni_data, [1], axis=0)
-        # print(ni_data_no_z.shape)
+        # #print(ni_data_no_z.shape)
         # return np.delete(ni_data, [1], axis=0)
 
 

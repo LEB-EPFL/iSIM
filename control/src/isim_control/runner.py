@@ -5,12 +5,13 @@ from isim_control.settings import iSIMSettings
 from isim_control.ni import live, acquisition, devices
 from isim_control.settings_translate import useq_from_settings
 
+import time
 
 class iSIMRunner:
     def __init__(self, mmcore: CMMCorePlus, live_engine: live.LiveEngine,
                  acquisition_engine: acquisition.AcquisitionEngine, devices: devices.NIDeviceGroup,
                  settings: iSIMSettings = None, publisher: Publisher = None):
-        self.mmc = mmcore or CMMCorePlus.instance()
+        self.mmc = mmcore
         routes = {"live_button_clicked": [self._on_live_toggle],
                   "acquisition_start": [self._on_acquisition_start],
                   "acquisition_pause": [self._on_acquisition_pause],
@@ -18,14 +19,16 @@ class iSIMRunner:
                   "settings_change": [self._on_settings_change]}
         self.sub = Subscriber(["gui"], routes)
         self.pub = publisher
+        self.last_restart = 0
 
         self.settings = settings or iSIMSettings()
         self.live_engine = live_engine
         self.acquisition_engine = acquisition_engine
         self.devices = devices
 
+        print(self.mmc)
         self.mmc.mda.events.sequenceFinished.connect(self._on_acquisition_finished)
-        self.mmc.events.configSet.connect(self._restart_live)
+        self.mmc.events.propertyChanged.connect(self._restart_live)
 
     def _on_acquisition_finished(self):
         self.pub.publish("gui", "acquisition_finished")
@@ -47,14 +50,19 @@ class iSIMRunner:
     def _on_live_toggle(self, toggled):
         print(f"Broker: live toggled {toggled}")
         if toggled:
+            self.devices.update_settings(self.settings)
             self.live_engine.update_settings(self.settings)
             self.live_engine._on_sequence_started()
         else:
             self.live_engine._on_sequence_stopped()
 
-    def _restart_live(self, prop, value):
-        print("restart live if necessary")
-        self.live_engine.restart()
+    def _restart_live(self, device, *_):
+        'Once a second restart live if property has changed'
+        if time.perf_counter() - self.last_restart < 1:
+            print(device, " changed!")
+            self.mmc.waitForDevice(device)
+            self.live_engine.restart()
+        self.last_restart = time.perf_counter()
 
     def _on_settings_change(self, keys, value):
         self.settings.set_by_path(keys, value)
