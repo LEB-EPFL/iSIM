@@ -25,6 +25,7 @@ class iSIMRunner:
         self.devices = devices
 
         self.mmc.mda.events.sequenceFinished.connect(self._on_acquisition_finished)
+        self.mmc.events.configSet.connect(self._restart_live)
 
     def _on_acquisition_finished(self):
         self.pub.publish("gui", "acquisition_finished")
@@ -50,6 +51,10 @@ class iSIMRunner:
             self.live_engine._on_sequence_started()
         else:
             self.live_engine._on_sequence_stopped()
+
+    def _restart_live(self, prop, value):
+        print("restart live if necessary")
+        self.live_engine.restart()
 
     def _on_settings_change(self, keys, value):
         self.settings.set_by_path(keys, value)

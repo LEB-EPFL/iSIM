@@ -51,6 +51,12 @@ class LiveEngine():
         except:
             print("Acquisition not yet started")
 
+    def restart(self):
+        if self.timer:
+            print("Restart live")
+            self.timer.crash()
+            self.timer = LiveTimer(1/self.fps, self.settings, self.task, self.devices, self._mmc)
+            self.timer.start()
 
     def update_settings(self, settings):
         self.settings = settings['live']
@@ -84,7 +90,6 @@ class LiveTimer(Timer):
             self.snap_lock.acquire()
             self.task.stop()
             if self.cancel_requested:
-
                 break
 
     def snap_and_get(self):
@@ -96,6 +101,11 @@ class LiveTimer(Timer):
 
     def request_cancel(self):
         self.cancel_requested = True
+
+    def crash(self):
+        self.task.stop()
+        self.cancel_requested = True
+        self.snap_lock.release()
 
     def one_frame(self):
         event = MDAEvent(channel={'config':self.settings['channel']})

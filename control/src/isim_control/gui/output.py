@@ -42,8 +42,8 @@ class OutputGUI(QObject):
         self.datastore = QLocalDataStore(shape, mmcore=self.mmc)
         if self.settings['save']:
             self.writer = OMETiffWriter(self.settings['path'])
-        self.writer.sequenceStarted(sequence)
-        self.mmc.mda.events.frameReady.connect(self.writer.frameReady)
+            self.writer.sequenceStarted(sequence)
+            self.mmc.mda.events.frameReady.connect(self.writer.frameReady)
         self.viewer = StackViewer(datastore=self.datastore, mmcore=self.mmc,
                                   sequence=useq_from_settings(self.settings))
         self.viewer.show()
