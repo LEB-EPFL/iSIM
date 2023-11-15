@@ -1,6 +1,7 @@
 from pymmcore_plus import CMMCorePlus
 from pymmcore_plus.mda import MDAEngine
 import nidaqmx
+import nidaqmx.stream_writers
 from threading import Thread, Lock
 import numpy as np
 import time
@@ -63,7 +64,6 @@ class AcquisitionEngine(MDAEngine):
         # Check that the camera has been asked to snap and start the generation on the DAQ
         self.snap_lock.acquire()
         self.task.start()
-
         return ()
 
     def snap_and_get(self, event):
@@ -86,14 +86,11 @@ class AcquisitionEngine(MDAEngine):
         next(self.internal_event_iterator)
         self._mmc.setPosition(self.settings['ni']['relative_z'])
 
-        #
-
     def update_settings(self, settings):
         self.settings = settings
         self.task.timing.cfg_samp_clk_timing(rate=self.settings['ni']['sample_rate'],
                                         samps_per_chan=settings['ni']['total_points'] +
                                         settings['ni']['readout_points']//3*2,)
-
 
 
 class TimedAcquisitionEngine(AcquisitionEngine):

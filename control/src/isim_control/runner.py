@@ -37,6 +37,7 @@ class iSIMRunner:
 
     def _on_acquisition_start(self, toggled):
         print(f"Broker: acquisition toggled {toggled}")
+        self.settings['ni']['relative_z'] = self.mmc.getPosition()
         self.devices.update_settings(self.settings)
         self.acquisition_engine.update_settings(self.settings)
 
