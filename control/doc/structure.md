@@ -1,5 +1,5 @@
 ```mermaid
-flowchart TB
+flowchart TB;
     useq((useq))
     pymmcore-widgets((pymmcore-widgets))
     iSIMSettings{iSIMSettings}
@@ -29,7 +29,7 @@ flowchart TB
 
 
     pymmcore-plus --> MDARunner
-    Comm -- acq_clicked \n MDASequence--> MDARunner
+    Comm -- acq_clicked MDASequence--> MDARunner
     Comm -- settings['ni'] --> devices
 
 
@@ -56,10 +56,9 @@ flowchart TB
     snap --> LiveViewer
 
     devices --> LiveEngine
-    Comm -- settings['live'] \n live_clicked--> LiveEngine
+    Comm -- settings['live'] live_clicked--> LiveEngine
 
     control.gui --> LiveSettings
     pymmcore-widgets --> control.gui
     LiveSettings --> Comm
-
 ```
