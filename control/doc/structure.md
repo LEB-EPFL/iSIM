@@ -30,7 +30,7 @@ flowchart TB;
 
     pymmcore-plus --> MDARunner
     Comm -- acq_clicked, MDASequence--> MDARunner
-    Comm -- settings['ni'] --> devices
+    Comm -- settings --> devices
 
 
     MDARunner -- MDAEvent, MDASequence --> iSIMEngine
@@ -56,7 +56,7 @@ flowchart TB;
     snap --> LiveViewer
 
     devices --> LiveEngine
-    Comm -- settings['live'] live_clicked--> LiveEngine
+    Comm -- settings live_clicked--> LiveEngine
 
     control.gui --> LiveSettings
     pymmcore-widgets --> control.gui
