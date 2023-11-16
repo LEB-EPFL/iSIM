@@ -29,11 +29,11 @@ flowchart TB;
 
 
     pymmcore-plus --> MDARunner
-    Comm -- acq_clicked MDASequence--> MDARunner
+    Comm -- acq_clicked, MDASequence--> MDARunner
     Comm -- settings['ni'] --> devices
 
 
-    MDARunner -- MDAEvent, \n MDASequence --> iSIMEngine
+    MDARunner -- MDAEvent, MDASequence --> iSIMEngine
     iSIMEngine -- MDASequence --> setup_sequence
     iSIMEngine --> exec_event
     iSIMEngine -- MDAEvent --> setup_event
