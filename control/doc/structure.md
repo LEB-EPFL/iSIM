@@ -1,30 +1,37 @@
 ```mermaid
-flowchart TD;
+flowchart TB
     useq((useq))
-    pymmcore-plus((pymmcore-plus))
     pymmcore-widgets((pymmcore-widgets))
+    iSIMSettings{iSIMSettings}
+    iSIMRunner{iSIMRunner}
+    pymmcore-plus((pymmcore-plus))
     iSIMEngine{iSIMEngine}
     control.gui{control.gui}
-    iSIMRunner{iSIMRunner \n iSIMSettings}
 
+    subgraph Comm
+        direction LR
+        iSIMRunner <--> iSIMSettings
+    end
     devices{devices}
     NIDAQ[[NIDAQ]]
     nidaqmx((nidaqmx))
 
     %% Acquisisitons
+
     useq --> MDASequence
     pymmcore-widgets --> MDAWidget
     control.gui --> AcquisitionSettings
-    AcquisitionSettings --> iSIMRunner
     MDAWidget --> AcquireButton
-    AcquireButton --> iSIMRunner
+    AcquireButton --> Comm
     MDAWidget --> useq
+    MDASequence --> Comm
+    AcquisitionSettings --> Comm
 
-    MDASequence --> iSIMRunner
+
     pymmcore-plus --> MDARunner
+    Comm -- acq_clicked \n MDASequence--> MDARunner
+    Comm -- settings['ni'] --> devices
 
-    iSIMRunner -- acq_clicked \n MDASequence--> MDARunner
-    iSIMRunner -- settings['ni'] --> devices
 
     MDARunner -- MDAEvent, \n MDASequence --> iSIMEngine
     iSIMEngine -- MDASequence --> setup_sequence
@@ -42,17 +49,17 @@ flowchart TD;
 
     %% Live Mode
     pymmcore-widgets --> LiveButton
-    LiveButton --> iSIMRunner
+    LiveButton --> Comm
     LiveEngine{LiveEngine} --> nidaqmx
     LiveEngine --> snap
     NIDAQ --> snap
     snap --> LiveViewer
 
     devices --> LiveEngine
-    iSIMRunner -- settings['live'] \n live_clicked--> LiveEngine
+    Comm -- settings['live'] \n live_clicked--> LiveEngine
 
     control.gui --> LiveSettings
     pymmcore-widgets --> control.gui
-    LiveSettings --> iSIMRunner
+    LiveSettings --> Comm
 
 ```
