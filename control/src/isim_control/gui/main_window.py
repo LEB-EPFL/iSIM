@@ -95,7 +95,6 @@ class MainWindow(QMainWindow):
 
         self.main.layout().addWidget(self.channelBox, 0, 1, 3, 1)
 
-
         self.mda_button.pressed.connect(self._mda)
 
         self.live_led.setChecked(True)
@@ -190,6 +189,12 @@ class MainWindow(QMainWindow):
                     slider.setDisabled(True)
         return super().eventFilter(obj, event)
 
+    def closeEvent(self, event):
+        "Close all windows if main window is closed."
+        app = QApplication.instance()
+        app.closeAllWindows()
+        super().closeEvent(event)
+
 
 class iSIM_StageWidget(QWidget):
     def __init__(self, mmc):
@@ -203,6 +208,7 @@ class iSIM_StageWidget(QWidget):
 
 if __name__ == "__main__":
     from isim_control.settings import iSIMSettings
+    from isim_control.settings_translate import save_settings, load_settings
     from isim_control.pubsub import Publisher, Broker
     from isim_control.runner import iSIMRunner
     from isim_control.ni import live, acquisition, devices
@@ -214,8 +220,10 @@ if __name__ == "__main__":
     broker = Broker()
 
     mmc = CMMCorePlus.instance()
-    settings = iSIMSettings(time_plan = {"interval": 0.2, "loops": 20},)
-    settings['twitchers'] = True
+    settings = load_settings()
+    import json
+    print(json.dumps(settings, indent=4))
+
     isim_devices = devices.NIDeviceGroup(settings=settings)
 
     try:
@@ -254,7 +262,7 @@ if __name__ == "__main__":
     preview = ImagePreview(mmcore=mmc)
     mmc.mda.events.frameReady.connect(preview._on_image_snapped)
     preview.show()
-
+    print(mmc)
     runner = iSIMRunner(mmc,
                         live_engine=live_engine,
                         acquisition_engine=acq_engine,
@@ -272,6 +280,7 @@ if __name__ == "__main__":
 
     group_presets = GroupPresetTableWidget(mmcore=mmc)
     frame.main.layout().addWidget(group_presets, 5, 0, 1, 3)
+    group_presets.show() # needed to keep events alive?
     frame.show()
 
     from isim_control.gui.output import OutputGUI
@@ -284,7 +293,7 @@ if __name__ == "__main__":
 
     app.exec_()
     broker.stop()
-
+    save_settings(runner.settings)
 
     if monogram:
         monogram.stop()

@@ -23,34 +23,38 @@ class iSIMSettings(dict):
         camera_name: str = "Prime",
         camera_readout_time: float = 0.029,
         ni_sample_rate: int = 60_066,
+        full_settings: dict = None,
                  ):
         super().__init__()
-        self['use_filters'] = use_filters
-        self['acquisition'] = {}
-        self['acquisition']['axis_order'] = axis_order
-        self['acquisition']['channels'] = channels
-        self['exposure_time'] = channels[0]['exposure']/1000
-        self['acquisition']['z_plan'] = z_plan
-        self['acquisition']['time_plan'] = time_plan
-        self['acquisition']['grid_plan'] = grid_plan
+        if full_settings is None:
+            self['use_filters'] = use_filters
+            self['acquisition'] = {}
+            self['acquisition']['axis_order'] = axis_order
+            self['acquisition']['channels'] = channels
+            self['exposure_time'] = channels[0]['exposure']/1000
+            self['acquisition']['z_plan'] = z_plan
+            self['acquisition']['time_plan'] = time_plan
+            self['acquisition']['grid_plan'] = grid_plan
 
-        self['camera'] = {}
-        self['camera']['name'] = camera_name
-        self['camera']['readout_time'] = camera_readout_time
+            self['camera'] = {}
+            self['camera']['name'] = camera_name
+            self['camera']['readout_time'] = camera_readout_time
 
-        self['save'] = True
-        self['path'] = "C:/Users/stepp/Desktop/MyTIFF.ome.tiff"
+            self['save'] = True
+            self['path'] = "C:/Users/stepp/Desktop/MyTIFF.ome.tiff"
 
-        self['ni'] = {}
-        self['ni']['twitchers'] = twitchers
-        self['ni']['relative_z'] = relative_z
-        self['ni']['laser_powers'] = laser_powers
-        self['ni']['sample_rate'] = ni_sample_rate
+            self['ni'] = {}
+            self['ni']['twitchers'] = twitchers
+            self['ni']['relative_z'] = relative_z
+            self['ni']['laser_powers'] = laser_powers
+            self['ni']['sample_rate'] = ni_sample_rate
 
-        self['live'] = {"channel": "561", "fps": 5, "twitchers": False}
-        self['live']['ni'] = {"laser_powers": {'488': 50, '561': 50, 'led': 100}}
+            self['live'] = {"channel": "561", "fps": 5, "twitchers": False}
+            self['live']['ni'] = {"laser_powers": {'488': 50, '561': 50, 'led': 100}}
 
-        self['live_mode'] = False
+            self['live_mode'] = False
+        else:
+            self.update(full_settings)
 
         self.calculate_ni_settings()
         self.set_defaults_grid_plan()

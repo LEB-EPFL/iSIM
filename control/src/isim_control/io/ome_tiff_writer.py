@@ -33,6 +33,8 @@ class OMETiffWriter:
         self._set_sequence(seq)
 
     def frameReady(self, frame: np.ndarray, event: useq.MDAEvent, meta: dict) -> None:
+        if event is None:
+            return
         if self._mmap is None:
             if not self._current_sequence:
                 # just in case sequenceStarted wasn't called
