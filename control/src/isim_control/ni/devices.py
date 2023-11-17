@@ -3,6 +3,7 @@ from typing import Protocol
 import numpy as np
 from scipy import ndimage
 import useq
+import nidaqmx
 
 class DAQDevice(Protocol):
     """A device that can be controlled with data from an NIDAQ card."""
@@ -23,7 +24,6 @@ class DAQDevice(Protocol):
 
 class NIDeviceGroup():
     def __init__(self, settings: dict = None):
-
         self.galvo = Galvo()
         self.camera = Camera()
         self.aotf = AOTF()
@@ -31,6 +31,7 @@ class NIDeviceGroup():
         self.stage = Stage()
         self.led = LED()
         self.settings = settings or {}
+        self.task, self.stream = self.make_task(settings)
 
     def get_data(self, event: useq.MDAEvent, next_event: useq.MDAEvent|None = None, live=False):
         galvo = self.galvo.one_frame(self.settings['ni'])[:-self.settings['ni']['readout_points']//3]
@@ -46,8 +47,32 @@ class NIDeviceGroup():
         # led[0, -1:] = np.ones(1)*6
         return np.vstack([galvo, stage, camera, aotf, led, twitcher])
 
+    def make_task(self, settings):
+        task = nidaqmx.Task()
+        task.ao_channels.add_ao_voltage_chan('Dev1/ao0') # galvo channel
+        task.ao_channels.add_ao_voltage_chan('Dev1/ao1') # z stage
+        task.ao_channels.add_ao_voltage_chan('Dev1/ao2') # camera
+        task.ao_channels.add_ao_voltage_chan('Dev1/ao3') # aotf blanking channel
+        task.ao_channels.add_ao_voltage_chan('Dev1/ao4') # aotf 488 channel
+        task.ao_channels.add_ao_voltage_chan('Dev1/ao5') # aotf 561 channel
+        task.ao_channels.add_ao_voltage_chan('Dev1/ao6') # LED channel
+        task.ao_channels.add_ao_voltage_chan('Dev1/ao7') # twitcher channel
+        task.timing.cfg_samp_clk_timing(rate=self.settings['ni']['sample_rate'],
+                                             samps_per_chan=settings['ni']['total_points'] +
+                                             settings['ni']['readout_points']//3*2,)
+        task.out_stream.regen_mode = nidaqmx.constants.RegenerationMode.DONT_ALLOW_REGENERATION
+        stream = nidaqmx.stream_writers.AnalogMultiChannelWriter(task.out_stream,
+                                                                      auto_start=False)
+        return task, stream
+
     def update_settings(self, settings: dict):
         self.settings = settings
+        self.update_task(settings)
+
+    def update_task(self, settings):
+        self.task.timing.cfg_samp_clk_timing(rate=self.settings['ni']['sample_rate'],
+                                samps_per_chan=settings['ni']['total_points'] +
+                                settings['ni']['readout_points']//3*2,)
 
 
 def makePulse(start, end, offset, n_points):

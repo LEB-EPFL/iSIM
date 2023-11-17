@@ -45,11 +45,11 @@ class LiveEngine():
         self.timer.start()
 
     def _on_sequence_stopped(self):
-        try:
+        if self.timer:
             self.timer.request_cancel()
-            self.timer = None
-        except:
-            #print("Acquisition not yet started")
+            if self.timer.running:
+                Timer(0.15, self._on_sequence_stopped).start()
+        self.timer = None
 
     def restart(self):
         if self.timer:
@@ -57,7 +57,7 @@ class LiveEngine():
             if self.timer.running:
                 #print("LiveTimer still running")
                 self.timer.request_cancel()
-                Timer(0.3, self.restart).start()
+                Timer(0.15, self.restart).start()
                 return
             self.timer = None
             #print("Now restarting")
@@ -89,6 +89,7 @@ class LiveTimer(Timer):
 
     def run(self):
         self.running = True
+        thread = None
         while not self.finished.wait(self.interval):
             if self.stop_event.is_set():
                 break
@@ -104,17 +105,15 @@ class LiveTimer(Timer):
             self.task.stop()
             if self.stop_event.is_set():
                 break
-
         #print("Waiting for THREAD")
-        thread.join(1)
-        #we resend the data in case the camera has not finished
+        if thread:
+            thread.join(0.2)
+        # We resend the data in case the camera has not finished and needs an additional trigger
         while self.snapping.is_set():
-            #print("Rewriting clean up data")
             self.task.write(self.one_frame(clean_up=True))
             self.task.start()
             self.task.wait_until_done()
             self.task.stop()
-        #print("Live TIMER DONE")
         self.running = False
 
     def snap_and_get(self):
@@ -124,7 +123,7 @@ class LiveTimer(Timer):
             self.snapping.set()
             self._mmc.snapImage()
             self.snapping.clear()
-            self._mmc.mda.events.frameReady.emit(self._mmc.getImage(fix=False), None,
+            self._mmc.events.liveFrameReady.emit(self._mmc.getImage(fix=False), None,
                                                  self._mmc.getTags())
         except Exception as e:
             #print(e)
@@ -141,15 +140,9 @@ class LiveTimer(Timer):
         ni_data = self.devices.get_data(event, next_event, live=True)
         if not clean_up:
             return ni_data
-        else:
-            #print(ni_data.shape)
-            ni_data[-2, :] = np.zeros(ni_data.shape[1])
-            ni_data[3, :] = np.zeros(ni_data.shape[1])
-            return ni_data
-        # ni_data_no_z = np.delete(ni_data, [1], axis=0)
-        # #print(ni_data_no_z.shape)
-        # return np.delete(ni_data, [1], axis=0)
-
+        ni_data[-2, :] = np.zeros(ni_data.shape[1])
+        ni_data[3, :] = np.zeros(ni_data.shape[1])
+        return ni_data
 
 
 if __name__ == "__main__":

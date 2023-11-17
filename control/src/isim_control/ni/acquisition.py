@@ -2,7 +2,7 @@ from pymmcore_plus import CMMCorePlus
 from pymmcore_plus.mda import MDAEngine
 import nidaqmx
 import nidaqmx.stream_writers
-from threading import Thread, Lock
+from threading import Thread, Lock, Event
 import numpy as np
 import time
 import copy
@@ -22,24 +22,11 @@ class AcquisitionEngine(MDAEngine):
         self.settings = settings or iSIMSettings()
         self.device_group = device_group
 
-        self.task = nidaqmx.Task()
-        self.task.ao_channels.add_ao_voltage_chan('Dev1/ao0') # galvo channel
-        self.task.ao_channels.add_ao_voltage_chan('Dev1/ao1') # z stage
-        self.task.ao_channels.add_ao_voltage_chan('Dev1/ao2') # camera
-        self.task.ao_channels.add_ao_voltage_chan('Dev1/ao3') # aotf blanking channel
-        self.task.ao_channels.add_ao_voltage_chan('Dev1/ao4') # aotf 488 channel
-        self.task.ao_channels.add_ao_voltage_chan('Dev1/ao5') # aotf 561 channel
-        self.task.ao_channels.add_ao_voltage_chan('Dev1/ao6') # LED channel
-        self.task.ao_channels.add_ao_voltage_chan('Dev1/ao7') # twitcher channel
-        self.task.timing.cfg_samp_clk_timing(rate=self.settings['ni']['sample_rate'],
-                                             samps_per_chan=settings['ni']['total_points'] +
-                                             settings['ni']['readout_points']//3*2,)
-        self.task.out_stream.regen_mode = nidaqmx.constants.RegenerationMode.DONT_ALLOW_REGENERATION
-        self.stream = nidaqmx.stream_writers.AnalogMultiChannelWriter(self.task.out_stream,
-                                                                      auto_start=False,
-                                                                      )
+        self.task = self.device_group.task
         self.mmc.mda.events.sequenceFinished.connect(self.on_sequence_end)
         self.snap_lock = Lock()
+
+        self.running = Event()
 
     def setup_event(self, event: MDAEvent):
         try:
@@ -78,6 +65,7 @@ class AcquisitionEngine(MDAEngine):
         self.task.wait_until_done()
         self.task.stop()
         self.snap_lock.release()
+        self.running.clear()
 
     def setup_sequence(self, sequence):
         # Potentially we could set up data for the whole sequence here
@@ -85,12 +73,11 @@ class AcquisitionEngine(MDAEngine):
         self.internal_event_iterator = self.sequence.iter_events()
         next(self.internal_event_iterator)
         self._mmc.setPosition(self.settings['ni']['relative_z'])
+        self.running.set()
 
     def update_settings(self, settings):
         self.settings = settings
-        self.task.timing.cfg_samp_clk_timing(rate=self.settings['ni']['sample_rate'],
-                                        samps_per_chan=settings['ni']['total_points'] +
-                                        settings['ni']['readout_points']//3*2,)
+
 
 
 class TimedAcquisitionEngine(AcquisitionEngine):

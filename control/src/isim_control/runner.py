@@ -6,6 +6,7 @@ from isim_control.ni import live, acquisition, devices
 from isim_control.settings_translate import useq_from_settings
 
 import time
+from threading import Timer
 
 class iSIMRunner:
     def __init__(self, mmcore: CMMCorePlus, live_engine: live.LiveEngine,
@@ -26,7 +27,6 @@ class iSIMRunner:
         self.acquisition_engine = acquisition_engine
         self.devices = devices
 
-        print(self.mmc)
         self.mmc.mda.events.sequenceFinished.connect(self._on_acquisition_finished)
         self.mmc.events.propertyChanged.connect(self._restart_live)
 
@@ -40,16 +40,18 @@ class iSIMRunner:
         self.mmc.mda.toggle_pause()
 
     def _on_acquisition_start(self, toggled):
-        print(f"Broker: acquisition toggled {toggled}")
+        if self.live_engine.timer:
+            self.live_engine._on_sequence_stopped()
         self.settings['ni']['relative_z'] = self.mmc.getPosition()
         self.devices.update_settings(self.settings)
         self.acquisition_engine.update_settings(self.settings)
-
         self.mmc.run_mda(useq_from_settings(self.settings))
 
     def _on_live_toggle(self, toggled):
-        print(f"Broker: live toggled {toggled}")
+        if self.acquisition_engine.running.is_set():
+            return
         if toggled:
+            self.settings.calculate_ni_settings(self.settings['live']['exposure'])
             self.devices.update_settings(self.settings)
             self.live_engine.update_settings(self.settings)
             self.live_engine._on_sequence_started()
@@ -65,7 +67,23 @@ class iSIMRunner:
         self.last_restart = time.perf_counter()
 
     def _on_settings_change(self, keys, value):
+        orig_live_exposure = self.settings['live']['exposure']
         self.settings.set_by_path(keys, value)
+        if keys == ['live', 'exposure'] and orig_live_exposure != value:
+            restart = False
+            self.settings.calculate_ni_settings(value)
+            if self.live_engine.timer:
+                self.live_engine._on_sequence_stopped()
+                restart = True
+            self.mmc.setExposure(self.settings['camera']['exposure']*1000)
+            self.mmc.waitForDevice(self.mmc.getCameraDevice())
+            print("EXPOSURE SET", self.mmc.getExposure())
+            self.devices.update_settings(self.settings)
+            self.live_engine.update_settings(self.settings)
+            if restart:
+                Timer(0.5, self.live_engine._on_sequence_started).start()
+
+
         self.live_engine.update_settings(self.settings)
         self.acquisition_engine.update_settings(self.settings)
 

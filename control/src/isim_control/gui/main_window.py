@@ -1,6 +1,6 @@
 from qtpy.QtWidgets import (QApplication, QPushButton, QWidget, QGridLayout, QGroupBox,
                             QRadioButton, QSpinBox, QLabel, QCheckBox, QMainWindow)
-from qtpy.QtCore import Qt
+from qtpy.QtCore import Qt, Signal
 
 from pymmcore_widgets import GroupPresetTableWidget, StageWidget
 from superqt import QLabeledSlider, fonticon
@@ -75,6 +75,13 @@ class MainWindow(QMainWindow):
         self.twitchers.toggled.connect(self._twitchers_changed)
         self.twitchers.setChecked(settings['live']['twitchers'])
 
+        self.exp_label = QLabel("Exposure (ms)")
+        self.live_exposure = QSpinBox()
+        self.live_exposure.setRange(20, 300)
+        self.live_exposure.setSingleStep(10)
+        self.live_exposure.setValue(settings['live']['exposure'])
+        self.live_exposure.valueChanged.connect(self._live_exposure_change)
+
         self.setWindowTitle("MyMDA")
 
         self.channelBox.setLayout(QGridLayout())
@@ -92,8 +99,11 @@ class MainWindow(QMainWindow):
         self.main.layout().addWidget(self.live_fps_label, 0, 2)
         self.main.layout().addWidget(self.live_fps, 0, 3)
         self.main.layout().addWidget(self.twitchers, 1, 2, 1, 2)
+        self.main.layout().addWidget(self.exp_label, 2, 2, 1, 2)
+        self.main.layout().addWidget(self.live_exposure, 3, 2, 1, 2)
 
-        self.main.layout().addWidget(self.channelBox, 0, 1, 3, 1)
+
+        self.main.layout().addWidget(self.channelBox, 0, 1, 4, 1)
 
         self.mda_button.pressed.connect(self._mda)
 
@@ -106,6 +116,9 @@ class MainWindow(QMainWindow):
 
     def _mda(self):
         self.mda_window.show()
+
+    def _live_exposure_change(self, value):
+        self.pub.publish("gui", "settings_change", [['live', "exposure"], value])
 
     def _488_activate(self, toggle):
         if toggle:
@@ -207,7 +220,7 @@ class iSIM_StageWidget(QWidget):
 
 
 if __name__ == "__main__":
-    from isim_control.settings import iSIMSettings
+    # from isim_control.settings import iSIMSettings
     from isim_control.settings_translate import save_settings, load_settings
     from isim_control.pubsub import Publisher, Broker
     from isim_control.runner import iSIMRunner
@@ -220,10 +233,15 @@ if __name__ == "__main__":
     broker = Broker()
 
     mmc = CMMCorePlus.instance()
-    settings = load_settings()
-    import json
-    print(json.dumps(settings, indent=4))
+    #This is hacky, might just want to make our own preview
+    events_class = mmc.events.__class__
+    new_cls = type(
+        events_class.__name__, events_class.__bases__,
+        {**events_class.__dict__, 'liveFrameReady': Signal(object, object, dict)},
+    )
+    mmc.events.__class__ = new_cls
 
+    settings = load_settings()
     isim_devices = devices.NIDeviceGroup(settings=settings)
 
     try:
@@ -235,8 +253,7 @@ if __name__ == "__main__":
         mmc.setProperty("Sapphire", "State", 1)
         mmc.setProperty("Quantum_561nm", "Laser Operation", "On")
         mmc.setProperty("MCL NanoDrive Z Stage", "Settling time (ms)", 30)
-        mmc.setChannelGroup("Channel")
-        mmc.setExposure(129)
+        mmc.setExposure(settings['camera']['exposure']*1000)
         mmc.setAutoShutter(False)
 
         #Backend
@@ -260,9 +277,10 @@ if __name__ == "__main__":
 
     from pymmcore_widgets import ImagePreview
     preview = ImagePreview(mmcore=mmc)
-    mmc.mda.events.frameReady.connect(preview._on_image_snapped)
+    mmc.events.liveFrameReady.connect(preview._on_image_snapped)
     preview.show()
-    print(mmc)
+
+
     runner = iSIMRunner(mmc,
                         live_engine=live_engine,
                         acquisition_engine=acq_engine,

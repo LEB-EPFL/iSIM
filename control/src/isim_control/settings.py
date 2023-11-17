@@ -51,12 +51,13 @@ class iSIMSettings(dict):
 
             self['live'] = {"channel": "561", "fps": 5, "twitchers": False}
             self['live']['ni'] = {"laser_powers": {'488': 50, '561': 50, 'led': 100}}
+            self['live']['exposure'] = 100
 
             self['live_mode'] = False
         else:
             self.update(full_settings)
 
-        self.calculate_ni_settings()
+        self.calculate_ni_settings(self['live']['exposure'])
         self.set_defaults_grid_plan()
 
     def set_defaults_grid_plan(self):
@@ -67,10 +68,10 @@ class iSIMSettings(dict):
             self['acquisition']['grid_plan']['mode'] = "row_wise_snake"
             self['acquisition']['grid_plan']['relative_to'] = 'center'
 
-    def calculate_ni_settings(self):
-        self['camera']['exposure'] = (self['acquisition']['channels'][0]['exposure']/1000 +
+    def calculate_ni_settings(self, exposure:int = 100):
+        self['camera']['exposure'] = (exposure/1000 +
                                       self['camera']['readout_time'])
-        self['exposure_time'] = self['acquisition']['channels'][0]['exposure']/1000
+        self['exposure_time'] = exposure/1000
         self['ni']['exposure_points'] = int(np.floor(self['exposure_time']
                                                      *self['ni']['sample_rate']))
         self['ni']['readout_points'] = int(np.floor(self['camera']['readout_time']*

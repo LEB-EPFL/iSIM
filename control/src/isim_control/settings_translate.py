@@ -27,7 +27,8 @@ def save_settings(settings: iSIMSettings):
     path = Path.home() / ".isim" / "settings.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as file:
-        json.dump(settings, file)
+        file.write(json.dumps(settings, indent=2))
+
 
 def load_settings():
     try:
