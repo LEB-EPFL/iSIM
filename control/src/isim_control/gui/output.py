@@ -47,12 +47,9 @@ class OutputGUI(QObject):
             self.mmc.mda.events.frameReady.connect(self.writer.frameReady)
         # Delay the creation of the viewer so that the preview can finish
         self.size = (self.mmc.getImageHeight(), self.mmc.getImageWidth())
-        self.timer = QTimer()
-        self.timer.setSingleShot(True)
-        self.timer.timeout.connect(self.create_viewer)
         delay = int(max(0, 1200 - (time.perf_counter() - self.last_live_stop)*1000))
-        print("Delaying viewer creation by", delay, "ms")
-        self.timer.start(delay)
+        self.timer = QTimer.singleShot(delay, self.create_viewer)
+        # print("Delaying viewer creation by", delay, "ms")
 
     def create_viewer(self):
         self.viewer = StackViewer(datastore=self.datastore, mmcore=self.mmc,
@@ -63,4 +60,3 @@ class OutputGUI(QObject):
     def _on_live_toggle(self, toggled):
         if not toggled:
             self.last_live_stop = time.perf_counter()
-            print("OUPUT DETECTED LIVE STOP")

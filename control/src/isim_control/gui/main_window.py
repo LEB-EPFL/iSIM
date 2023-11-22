@@ -1,6 +1,6 @@
 from qtpy.QtWidgets import (QApplication, QPushButton, QWidget, QGridLayout, QGroupBox,
                             QRadioButton, QSpinBox, QLabel, QCheckBox, QMainWindow)
-from qtpy.QtCore import Qt, Signal
+from qtpy.QtCore import Qt, Signal, QTimer
 
 from pymmcore_widgets import GroupPresetTableWidget, StageWidget
 from superqt import QLabeledSlider, fonticon
@@ -178,6 +178,9 @@ class MainWindow(QMainWindow):
 
     def _snap(self):
         self.pub.publish("gui", "snap_button_clicked", [True])
+        #Limit the frequency of snaps
+        self.snap_button.setDisabled(True)
+        QTimer.singleShot(500, lambda: self.snap_button.setDisabled(False))
 
     def update_from_settings(self, settings: dict):
         self.live_power_488.setValue(settings['live']['ni']['laser_powers']['488'])
