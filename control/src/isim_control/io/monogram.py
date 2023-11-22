@@ -7,7 +7,7 @@ from pymmcore_plus import CMMCorePlus
 CUTOFF_SPEEDUP = 80 # This is 1/ms for last value change
 # CUTOFF_SPEEDDOWN = 5
 CUTOFF_SPEED = 200
-
+MAX_POSITION = 202 #um
 
 class MonogramCC():
 
@@ -43,7 +43,10 @@ class MonogramCC():
             self._device = device
             self._mmc = mmcore
 
-            self.z_pos = self._device.get_axis(0)
+            # Initialize to the current position of the stage
+            self.z_pos = self._mmc.getPosition(self._mmc.getFocusDevice())/MAX_POSITION
+            # self.offset = self.last_value = self.z_pos
+            # self.z_pos = self._device.get_axis(0)
             self.last_value = self._device.get_axis(0)
             self.last_value_turn = None
             self.offset = self.last_value
@@ -91,7 +94,7 @@ class MonogramCC():
             self.z_pos = self.z_pos + relative_move
             self.z_pos = min([self.z_pos, 1])
             self.z_pos = max([self.z_pos, 0])
-            self.scaled_z = self.z_pos * 202
+            self.scaled_z = self.z_pos * MAX_POSITION
 
             now = time.perf_counter()
             if now - self.last_send > 0.05:
@@ -109,8 +112,11 @@ if __name__ == "__main__":
     try:
         mmc.loadSystemConfiguration("C:/iSIM/iSIM/mm-configs/pymmcore_plus.cfg")
         stage = StageWidget("MCL NanoDrive Z Stage", mmcore=mmc)
-        mmc.setProperty("MCL NanoDrive Z Stage", "Settling time Z axis (ms)", 20)
-    except:
+        mmc.setProperty("MCL NanoDrive Z Stage", "Settling time (ms)", 20)
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        print("Could not load iSIM devices, going Democonfig")
         mmc.loadSystemConfiguration()
         stage = StageWidget("Z", mmcore=mmc)
     monogram = MonogramCC(mmcore=mmc)

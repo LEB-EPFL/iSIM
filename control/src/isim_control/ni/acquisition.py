@@ -23,6 +23,7 @@ class AcquisitionEngine(MDAEngine):
         self.device_group = device_group
 
         self.task = self.device_group.task
+        self.stream = self.device_group.stream
         self.mmc.mda.events.sequenceFinished.connect(self.on_sequence_end)
         self.snap_lock = Lock()
 
@@ -56,9 +57,9 @@ class AcquisitionEngine(MDAEngine):
     def snap_and_get(self, event):
         self.snap_lock.release()
         self._mmc.snapImage()
+        self.snap_lock.release()
         self._mmc.mda.events.frameReady.emit(self._mmc.getImage(fix=False), event,
                                              self._mmc.getTags())
-        self.snap_lock.release()
 
     def on_sequence_end(self, sequence):
         self.snap_lock.acquire()
