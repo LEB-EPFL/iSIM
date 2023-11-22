@@ -14,10 +14,12 @@ class iSIMRunner:
                  settings: iSIMSettings = None, publisher: Publisher = None):
         self.mmc = mmcore
         routes = {"live_button_clicked": [self._on_live_toggle],
+                  "snap_button_clicked": [self._on_snap],
                   "acquisition_start": [self._on_acquisition_start],
                   "acquisition_pause": [self._on_acquisition_pause],
                   "acquisition_cancel": [self._on_acquisition_cancel],
-                  "settings_change": [self._on_settings_change]}
+                  "settings_change": [self._on_settings_change]
+                  }
         self.sub = Subscriber(["gui"], routes)
         self.pub = publisher
         self.last_restart = 0
@@ -57,6 +59,14 @@ class iSIMRunner:
             self.live_engine._on_sequence_started()
         else:
             self.live_engine._on_sequence_stopped()
+
+    def _on_snap(self, *_):
+        if self.acquisition_engine.running.is_set():
+            return
+        self.settings.calculate_ni_settings(self.settings['live']['exposure'])
+        self.devices.update_settings(self.settings)
+        self.live_engine.update_settings(self.settings)
+        self.live_engine.snap()
 
     def _restart_live(self, device, *_):
         'Once a second restart live if property has changed'

@@ -23,22 +23,27 @@ def acquisition_settings_from_useq(settings: iSIMSettings, seq: MDASequence):
     settings.calculate_ni_settings()
     return settings
 
-def save_settings(settings: iSIMSettings):
-    path = Path.home() / ".isim" / "settings.json"
+def save_settings(settings: iSIMSettings|dict, filename: str = "settings"):
+    path = Path.home() / ".isim" / f"{filename}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as file:
         file.write(json.dumps(settings, indent=2))
 
 
-def load_settings():
+def load_settings(filename: str = "settings"):
     try:
-        path = Path.home() / ".isim" / "settings.json"
+        path = Path.home() / ".isim" / f"{filename}.json"
         with path.open("r") as file:
             settings_dict = json.load(file)
         if settings_dict == {}:
             raise FileNotFoundError
-        settings = iSIMSettings(full_settings=settings_dict)
-    except (FileNotFoundError, TypeError, AttributeError):
+        if filename == "settings":
+            settings = iSIMSettings(full_settings=settings_dict)
+        else:
+            settings = settings_dict
+    except (FileNotFoundError, TypeError, AttributeError) as e:
+        import traceback
+        print(traceback.format_exc())
         print("New iSIMSettings for this user")
         settings = iSIMSettings()
     return settings

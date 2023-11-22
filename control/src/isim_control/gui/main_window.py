@@ -37,6 +37,7 @@ class MainWindow(QMainWindow):
         self.live_button.setIcon(fonticon.icon(MDI6.play_circle_outline, color="lime"))
         self.live_button.clicked.connect(self._live)
         self.snap_button = QPushButton("Snap")
+        self.snap_button.clicked.connect(self._snap)
         self.mda_button = QPushButton("MDA")
 
         self.channelBox = QGroupBox("Live Channels")
@@ -165,7 +166,6 @@ class MainWindow(QMainWindow):
         self.pub.publish("gui", "settings_change", [['live', "twitchers"], toggle])
 
     def _live(self):
-        print(self.running)
         if not self.running:
             self.pub.publish("gui", "live_button_clicked", [True])
             self.live_button.setText("Pause")
@@ -175,6 +175,9 @@ class MainWindow(QMainWindow):
             self.live_button.setText("Live")
             self.live_button.setIcon(fonticon.icon(MDI6.play_circle_outline, color="lime"))
         self.running = not self.running
+
+    def _snap(self):
+        self.pub.publish("gui", "snap_button_clicked", [True])
 
     def update_from_settings(self, settings: dict):
         self.live_power_488.setValue(settings['live']['ni']['laser_powers']['488'])
@@ -273,12 +276,11 @@ if __name__ == "__main__":
         print("iSIM components could not be loaded.")
         mmc.loadSystemConfiguration()
 
-
-
-    from pymmcore_widgets import ImagePreview
-    preview = ImagePreview(mmcore=mmc)
-    mmc.events.liveFrameReady.connect(preview._on_image_snapped)
+    from isim_control.gui.preview import iSIMPreview
+    preview = iSIMPreview(mmc)
     preview.show()
+
+
 
 
     runner = iSIMRunner(mmc,

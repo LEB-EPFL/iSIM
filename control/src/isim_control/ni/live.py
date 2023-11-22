@@ -61,8 +61,17 @@ class LiveEngine():
                 return
             self.timer = None
             #print("Now restarting")
-            self.timer = LiveTimer(1/self.fps, self.settings, self.task, self.devices, self._mmc)
+            self.timer = LiveTimer(0, self.settings, self.task, self.devices, self._mmc)
             self.timer.start()
+
+    def snap(self):
+        if self.timer:
+            return
+        self.timer = LiveTimer(1/self.fps, self.settings, self.task, self.devices, self._mmc,
+                                snap_mode=True)
+        self.timer.stop_event.set()
+        self.timer.start()
+        self.timer = None
 
     def update_settings(self, settings):
         self.settings = settings['live']
@@ -74,12 +83,13 @@ class LiveEngine():
 
 class LiveTimer(Timer):
     def __init__(self, interval:float, settings: dict, task: nidaqmx.Task, devices: NIDeviceGroup,
-                 mmcore: CMMCorePlus):
+                 mmcore: CMMCorePlus, snap_mode=False):
         super().__init__(interval, None)
         self.settings = settings
         self.task = task
         self.devices = devices
         self._mmc = mmcore
+        self.snap_mode = snap_mode
         self.running = False
         self.snapping = False
 
@@ -91,7 +101,7 @@ class LiveTimer(Timer):
         self.running = True
         thread = None
         while not self.finished.wait(self.interval):
-            if self.stop_event.is_set():
+            if self.stop_event.is_set() and not self.snap_mode:
                 break
             self.snap_lock.acquire()
             #print("live_running")
