@@ -8,9 +8,8 @@ from isim_control.settings_translate import useq_from_settings
 from isim_control.pubsub import Subscriber
 from isim_control.io.ome_tiff_writer import OMETiffWriter
 
-from qtpy.QtCore import QObject, Signal
-
-
+from qtpy.QtCore import QObject, Signal, QTimer
+import time
 
 
 class OutputGUI(QObject):
@@ -20,10 +19,12 @@ class OutputGUI(QObject):
         self.mmc = mmcore
 
         routes = {"acquisition_start": [self._on_acquisition_start],
-                  "settings_change": [self._on_settings_change]}
+                  "settings_change": [self._on_settings_change],
+                  "live_button_clicked": [self._on_live_toggle],}
         self.sub = Subscriber(["gui"], routes)
         self.settings = iSIMSettings()
         self.acquisition_started.connect(self.make_viewer)
+        self.last_live_stop = time.perf_counter()
 
     def _on_settings_change(self, keys, value):
         self.settings.set_by_path(keys, value)
@@ -44,6 +45,22 @@ class OutputGUI(QObject):
             self.writer = OMETiffWriter(self.settings['path'])
             self.writer.sequenceStarted(sequence)
             self.mmc.mda.events.frameReady.connect(self.writer.frameReady)
+        # Delay the creation of the viewer so that the preview can finish
+        self.size = (self.mmc.getImageHeight(), self.mmc.getImageWidth())
+        self.timer = QTimer()
+        self.timer.setSingleShot(True)
+        self.timer.timeout.connect(self.create_viewer)
+        delay = int(max(0, 1200 - (time.perf_counter() - self.last_live_stop)*1000))
+        print("Delaying viewer creation by", delay, "ms")
+        self.timer.start(delay)
+
+    def create_viewer(self):
         self.viewer = StackViewer(datastore=self.datastore, mmcore=self.mmc,
-                                  sequence=useq_from_settings(self.settings))
+                                  sequence=useq_from_settings(self.settings),
+                                  size=self.size)
         self.viewer.show()
+
+    def _on_live_toggle(self, toggled):
+        if not toggled:
+            self.last_live_stop = time.perf_counter()
+            print("OUPUT DETECTED LIVE STOP")

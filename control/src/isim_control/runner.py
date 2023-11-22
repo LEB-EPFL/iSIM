@@ -44,9 +44,13 @@ class iSIMRunner:
     def _on_acquisition_start(self, toggled):
         if self.live_engine.timer:
             self.live_engine._on_sequence_stopped()
+            self.pub.publish("gui", "live_button_clicked", [False])
+            time.sleep(1)
         self.settings['ni']['relative_z'] = self.mmc.getPosition()
+        self.settings.calculate_ni_settings(self.settings['acquisition']['channels'][0]['exposure'])
         self.devices.update_settings(self.settings)
         self.acquisition_engine.update_settings(self.settings)
+        self.acquisition_engine.adjust_camera_exposure(self.settings['camera']['exposure']*1000)
         self.mmc.run_mda(useq_from_settings(self.settings))
 
     def _on_live_toggle(self, toggled):
@@ -69,7 +73,8 @@ class iSIMRunner:
         self.live_engine.snap()
 
     def _restart_live(self, device, *_):
-        'Once a second restart live if property has changed'
+        """Once a second restart live if property has changed"""
+        #TODO: should this go into LiveEngine?
         if time.perf_counter() - self.last_restart < 1:
             print(device, " changed!")
             self.mmc.waitForDevice(device)
@@ -92,8 +97,6 @@ class iSIMRunner:
             self.live_engine.update_settings(self.settings)
             if restart:
                 Timer(0.5, self.live_engine._on_sequence_started).start()
-
-
         self.live_engine.update_settings(self.settings)
         self.acquisition_engine.update_settings(self.settings)
 

@@ -3,6 +3,7 @@ from pymmcore_plus import CMMCorePlus
 from useq import MDASequence
 import json
 from pathlib import Path
+from datetime import timedelta
 
 def add_settings_from_core(mmcore: CMMCorePlus, settings: iSIMSettings):
     settings['camera']['name'] = mmcore.getCameraDevice()
@@ -24,6 +25,12 @@ def acquisition_settings_from_useq(settings: iSIMSettings, seq: MDASequence):
     return settings
 
 def save_settings(settings: iSIMSettings|dict, filename: str = "settings"):
+    # The interval in the time_plan settings is a timedelta, which is not JSON serializable
+    try:
+        settings['acquisition']['time_plan']['interval'] = \
+            settings['acquisition']['time_plan']['interval'].seconds
+    except:
+        pass
     path = Path.home() / ".isim" / f"{filename}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as file:
@@ -38,10 +45,12 @@ def load_settings(filename: str = "settings"):
         if settings_dict == {}:
             raise FileNotFoundError
         if filename == "settings":
+            settings_dict['acquisition']['time_plan']['interval'] = \
+                timedelta(seconds=settings_dict['acquisition']['time_plan']['interval'])
             settings = iSIMSettings(full_settings=settings_dict)
         else:
             settings = settings_dict
-    except (FileNotFoundError, TypeError, AttributeError) as e:
+    except (FileNotFoundError, TypeError, AttributeError, json.decoder.JSONDecodeError) as e:
         import traceback
         print(traceback.format_exc())
         print("New iSIMSettings for this user")

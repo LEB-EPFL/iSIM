@@ -277,9 +277,12 @@ if __name__ == "__main__":
         mmc.loadSystemConfiguration()
 
     from isim_control.gui.preview import iSIMPreview
-    preview = iSIMPreview(mmc)
+    preview = iSIMPreview(mmcore=mmc)
     preview.show()
-
+    # from pymmcore_widgets import ImagePreview
+    # preview = ImagePreview(mmcore=mmc)
+    # mmc.events.liveFrameReady.connect(preview._on_image_snapped)
+    # preview.show()
 
 
 

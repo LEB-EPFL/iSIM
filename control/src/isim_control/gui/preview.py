@@ -1,6 +1,6 @@
 from pymmcore_widgets import ImagePreview
-
-from qtpy.QtWidgets import QWidget, QGridLayout, QPushButton, QFileDialog
+from pymmcore_plus import CMMCorePlus
+from qtpy.QtWidgets import QWidget, QGridLayout, QPushButton, QFileDialog, QMainWindow
 from superqt import fonticon
 from fonticon_mdi6 import MDI6
 from tifffile import imsave
@@ -9,10 +9,12 @@ from pathlib import Path
 from isim_control.settings_translate import load_settings, save_settings
 
 
-class iSIMPreview(QWidget):
-    def __init__(self, mmcore):
-        super().__init__()
+class iSIMPreview(QMainWindow):
+    def __init__(self, parent: QWidget | None = None, mmcore: CMMCorePlus | None = None):
+        super().__init__(parent=parent)
         self._mmc = mmcore
+        self.main = QWidget()
+        self.setCentralWidget(self.main)
         self.preview = ImagePreview(mmcore=mmcore)
         self.current_frame = None
         self.save_loc = load_settings("live_save_location").get("path", Path.home())
@@ -21,8 +23,8 @@ class iSIMPreview(QWidget):
         self._mmc.events.liveFrameReady.connect(self.new_frame)
 
         self.setWindowTitle("Preview")
-        self.setLayout(QGridLayout())
-        self.layout().addWidget(self.preview, 0, 0, 1, 5)
+        self.main.setLayout(QGridLayout())
+        self.main.layout().addWidget(self.preview, 0, 0, 1, 5)
 
         self.save_btn = QPushButton("Save")
         self.save_btn.clicked.connect(self.save_image)
@@ -31,8 +33,8 @@ class iSIMPreview(QWidget):
         self.collapse_btn.setIcon(fonticon.icon(MDI6.arrow_collapse_all))
         self.collapse_btn.clicked.connect(self.collapse_view)
 
-        self.layout().addWidget(self.save_btn, 1, 0)
-        self.layout().addWidget(self.collapse_btn, 1, 4)
+        self.main.layout().addWidget(self.save_btn, 1, 0)
+        self.main.layout().addWidget(self.collapse_btn, 1, 4)
 
     def new_frame(self, image, event, meta):
         self.current_frame = image

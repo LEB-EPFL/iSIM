@@ -21,6 +21,7 @@ class AcquisitionEngine(MDAEngine):
         self.mmc = mmc
         self.settings = settings or iSIMSettings()
         self.device_group = device_group
+        self.previous_exposure = None
 
         self.task = self.device_group.task
         self.stream = self.device_group.stream
@@ -67,6 +68,9 @@ class AcquisitionEngine(MDAEngine):
         self.task.stop()
         self.snap_lock.release()
         self.running.clear()
+        if self.previous_exposure != self._mmc.getExposure():
+            self._mmc.setExposure(self.previous_exposure)
+            print("EXPOSURE RESET", self.previous_exposure)
 
     def setup_sequence(self, sequence):
         # Potentially we could set up data for the whole sequence here
@@ -74,11 +78,18 @@ class AcquisitionEngine(MDAEngine):
         self.internal_event_iterator = self.sequence.iter_events()
         next(self.internal_event_iterator)
         self._mmc.setPosition(self.settings['ni']['relative_z'])
+        # Adjust the exposure time
         self.running.set()
 
     def update_settings(self, settings):
         self.settings = settings
 
+    def adjust_camera_exposure(self, exposure):
+        self.previous_exposure = self._mmc.getExposure()
+        print("CURRENT EXPOSURE", self.previous_exposure)
+        if self.previous_exposure != exposure:
+            self._mmc.setExposure(exposure)
+            self._mmc.waitForDevice(self.mmc.getCameraDevice())
 
 
 class TimedAcquisitionEngine(AcquisitionEngine):
@@ -95,8 +106,6 @@ class TimedAcquisitionEngine(AcquisitionEngine):
         return super().setup_sequence(sequence)
 
     def on_frame(self, image, event, meta):
-        # time_here = datetime.strptime(meta["Time"], '%Y-%m-%d %H:%M:%S.%f')
-        # self.frame_times[event.index['t']] = time_here.timestamp()*1000
         self.frame_times[event.index['t']] = time.perf_counter()*1000
 
     def show_timing(self):
@@ -105,11 +114,6 @@ class TimedAcquisitionEngine(AcquisitionEngine):
         std = np.std(np.diff(frame_times))
         print(round(mean_offset*100)/100, "±", round(std*100)/100, "ms, max",
               max(np.diff(frame_times)), "#", len(frame_times))
-        # pre_trigger_delay = float(self.mmc.getProperty("PrimeB_Camera", "Timing-ReadoutTimeNs"))/1e6
-        # pre_trigger_delay = pre_trigger_delay if pre_trigger_delay > 0 else None
-        # if pre_trigger_delay is None:
-        #     mode = self.mmc.getProperty("PrimeB_Camera", "ReadoutRate")
-        #     pre_trigger_delay = 12.94 if "100MHz" in mode else 5.85
         print("Excpected fastest cycle time: ",
               self.settings['exposure_time']*1000 + 2*float(self.mmc.getProperty("PrimeB_Camera", "Timing-ReadoutTimeNs"))/1e6 +
               + 8 + 3)
