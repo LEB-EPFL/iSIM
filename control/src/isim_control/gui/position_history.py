@@ -83,6 +83,7 @@ class PositionHistory(QtWidgets.QGraphicsView):
         self.mmc.events.XYStagePositionChanged.connect(self.stage_moved)
         # self.mmc.events.imageSnapped.connect(self.increase_values)
         self.mmc.mda.events.frameReady.connect(self.frame_ready)
+        self.mmc.events.liveFrameReady.connect(self.frame_ready)
         self.increase_values_signal.connect(self.increase_values)
         print(self.mmc)
 
@@ -90,6 +91,7 @@ class PositionHistory(QtWidgets.QGraphicsView):
         self.increase_values_signal.emit(frame, event, metadata)
 
     def stage_moved(self, name, new_pos0, new_pos1):
+        print("STAGE MOVED IN HISTORY", new_pos0, new_pos1)
         new_pos = [new_pos0, new_pos1]
         self.stage_pos = new_pos
         new_pos = [x/10 for x in new_pos]
@@ -180,8 +182,8 @@ class PositionHistory(QtWidgets.QGraphicsView):
         color = QtGui.QColor(0, 0, 0, 255)
         self.painter.setBrush(QtGui.QBrush(color))
         self.painter.drawRect(self.rect)
-        print(current_color)
-        print(my_color)
+        # print(current_color)
+        # print(my_color)
         qimage = QtGui.QImage(img.data, width, height, height, QtGui.QImage.Format_Grayscale8)
         qimage = qimage.convertToFormat(QtGui.QImage.Format_Indexed8)
         color_table = [QtGui.QColor().fromHsv(my_color[0], my_color[1], int(i*my_color[2]),
@@ -196,7 +198,7 @@ class PositionHistory(QtWidgets.QGraphicsView):
         # self.painter.drawRect(self.rect)
 
         self.my_pixmap.setPixmap(QtGui.QPixmap.fromImage(self.map))
-        print("time for drawing: ", time.perf_counter() - t0)
+        # print("time for drawing: ", time.perf_counter() - t0)
         self.painter.end()
 
     def define_painter(self, alpha=100):

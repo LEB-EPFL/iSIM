@@ -4,7 +4,7 @@ from pymmcore_widgets._mda._datastore import QLocalDataStore
 from useq import MDASequence
 
 from isim_control.settings import iSIMSettings
-from isim_control.settings_translate import useq_from_settings
+from isim_control.settings_translate import useq_from_settings, load_settings
 from isim_control.pubsub import Subscriber
 from isim_control.io.ome_tiff_writer import OMETiffWriter
 
@@ -24,6 +24,10 @@ class OutputGUI(QObject):
         self.sub = Subscriber(["gui"], routes)
         self.settings = iSIMSettings()
         self.acquisition_started.connect(self.make_viewer)
+        view_settings = load_settings("live_view")
+        self.transform = (view_settings.get("rot", 0),
+                          view_settings.get("mirror_x", False),
+                          view_settings.get("mirror_y", True))
         self.last_live_stop = time.perf_counter()
 
     def _on_settings_change(self, keys, value):
@@ -52,9 +56,10 @@ class OutputGUI(QObject):
         # print("Delaying viewer creation by", delay, "ms")
 
     def create_viewer(self):
+
         self.viewer = StackViewer(datastore=self.datastore, mmcore=self.mmc,
                                   sequence=useq_from_settings(self.settings),
-                                  size=self.size)
+                                  size=self.size, transform=self.transform)
         self.viewer.show()
 
     def _on_live_toggle(self, toggled):

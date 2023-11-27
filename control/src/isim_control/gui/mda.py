@@ -6,11 +6,14 @@ from qtpy.QtCore import Qt
 from superqt import QLabeledSlider, fonticon
 from isim_control.settings_translate import useq_from_settings
 from isim_control.gui.dark_theme import slider_theme
+from isim_control.gui.assets.qt_classes import QWidgetRestore
 
 from fonticon_mdi6 import MDI6
 
-class iSIMMDAWidget(MDASequenceWidget):
+class iSIMMDAWidget(QWidgetRestore):
     def __init__(self, settings:dict, publisher, parent=None):
+        super().__init__(parent=parent)
+        self.mda = MDASequenceWidget()
         self.settings = settings
         self.lasers = LaserPowers(settings)
         self.isim = iSIMSettingsWidget()
@@ -18,24 +21,26 @@ class iSIMMDAWidget(MDASequenceWidget):
         self.save_settings.set_state(settings)
 
         self.pub = publisher
-        super().__init__(parent=parent)
+        self.setWindowTitle("iSIM MDA")
         self.run_buttons = RunButtons(publisher, self)
+        self.setLayout(QVBoxLayout())
+        self.layout().addWidget(self.mda)
         self.layout().addWidget(self.lasers)
         self.layout().addWidget(self.isim)
         self.layout().addWidget(self.save_settings)
         self.layout().addWidget(self.run_buttons)
-        super().setValue(useq_from_settings(settings))
+        self.mda.setValue(useq_from_settings(settings))
 
     def setValue(self, settings: dict):
         seq = useq_from_settings(settings)
-        super().setValue(seq)
+        self.mda.setValue(seq)
         self.isim.set_state(settings)
         self.save_settings.set_state(settings)
         self.lasers.power_488.setValue(settings['ni']['laser_powers']['488'])
         self.lasers.power_561.setValue(settings['ni']['laser_powers']['561'])
 
     def get_settings(self):
-        self.settings['acquisition'] = super().value().model_dump()
+        self.settings['acquisition'] = self.mda.value().model_dump()
         self.settings['ni']['laser_powers']['488'] = self.lasers.power_488.value()
         self.settings['ni']['laser_powers']['561'] = self.lasers.power_561.value()
         isim_settings = self.isim.get_state()

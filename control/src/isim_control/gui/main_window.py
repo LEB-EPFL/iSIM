@@ -6,6 +6,7 @@ from pymmcore_widgets import GroupPresetTableWidget, StageWidget
 from superqt import QLabeledSlider, fonticon
 from isim_control.gui.dark_theme import slider_theme
 from isim_control.gui.dark_theme import set_dark
+from isim_control.gui.assets.qt_classes import QMainWindowRestore, QWidgetRestore
 
 from isim_control.pubsub import Subscriber, Publisher
 from isim_control.gui.mda import iSIMMDAWidget
@@ -14,7 +15,7 @@ import copy
 from fonticon_mdi6 import MDI6
 
 
-class MainWindow(QMainWindow):
+class MainWindow(QMainWindowRestore):
     def __init__(self, publisher:Publisher, settings: dict = {}):
         super().__init__()
         self.pub = publisher
@@ -208,21 +209,21 @@ class MainWindow(QMainWindow):
                     slider.setDisabled(True)
         return super().eventFilter(obj, event)
 
-    def closeEvent(self, event):
-        "Close all windows if main window is closed."
-        app = QApplication.instance()
-        app.closeAllWindows()
-        super().closeEvent(event)
 
 
-class iSIM_StageWidget(QWidget):
+class iSIM_StageWidget(QWidgetRestore):
     def __init__(self, mmc):
         super().__init__()
-        stage1 = StageWidget("MicroDrive XY Stage", mmcore=mmc)
-        stage2 = StageWidget("MCL NanoDrive Z Stage", mmcore=mmc)
+        self.stage1 = StageWidget("MicroDrive XY Stage", mmcore=mmc)
+        self.stage1._step.setValue(25)
+        self.stage2 = StageWidget("MCL NanoDrive Z Stage", mmcore=mmc)
+        self.stage2._step.setValue(5)
+        self.stage1.snap_checkbox.setVisible(False)
+        self.stage2.snap_checkbox.setVisible(False)
+
         self.setLayout(QGridLayout())
-        self.layout().addWidget(stage1, 2, 0)
-        self.layout().addWidget(stage2, 2, 1)
+        self.layout().addWidget(self.stage1, 2, 0)
+        self.layout().addWidget(self.stage2, 2, 1)
 
 
 if __name__ == "__main__":
@@ -259,6 +260,7 @@ if __name__ == "__main__":
         mmc.setProperty("Sapphire", "State", 1)
         mmc.setProperty("Quantum_561nm", "Laser Operation", "On")
         mmc.setProperty("MCL NanoDrive Z Stage", "Settling time (ms)", 30)
+        mmc.setXYStageDevice("MicroDrive XY Stage")
         mmc.setExposure(settings['camera']['exposure']*1000)
         mmc.setAutoShutter(False)
 
@@ -278,16 +280,12 @@ if __name__ == "__main__":
         # Not on the iSIM
         print("iSIM components could not be loaded.")
         mmc.loadSystemConfiguration()
+        stage = StageWidget("XY", mmcore=mmc)
+        stage.show()
 
     from isim_control.gui.preview import iSIMPreview
     preview = iSIMPreview(mmcore=mmc)
     preview.show()
-    # from pymmcore_widgets import ImagePreview
-    # preview = ImagePreview(mmcore=mmc)
-    # mmc.events.liveFrameReady.connect(preview._on_image_snapped)
-    # preview.show()
-
-
 
     runner = iSIMRunner(mmc,
                         live_engine=live_engine,
@@ -313,9 +311,9 @@ if __name__ == "__main__":
     output = OutputGUI(mmc)
     broker.attach(output)
 
-    # from isim_control.gui.position_history import PositionHistory
-    # history = PositionHistory(mmc)
-    # history.show()
+    from isim_control.gui.position_history import PositionHistory
+    history = PositionHistory(mmc)
+    history.show()
 
     app.exec_()
     broker.stop()
