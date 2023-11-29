@@ -29,11 +29,13 @@ def save_settings(settings: iSIMSettings|dict, filename: str = "settings"):
     try:
         settings['acquisition']['time_plan']['interval'] = \
             settings['acquisition']['time_plan']['interval'].seconds
+
     except:
         pass
     path = Path.home() / ".isim" / f"{filename}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as file:
+        print(settings)
         file.write(json.dumps(settings, indent=2))
 
 
@@ -53,6 +55,12 @@ def load_settings(filename: str = "settings"):
     except (FileNotFoundError, TypeError, AttributeError, json.decoder.JSONDecodeError) as e:
         import traceback
         print(traceback.format_exc())
-        print("New iSIMSettings for this user")
-        settings = iSIMSettings()
+        print(f"New {filename} settings for this user")
+        if filename == "settings":
+            settings = iSIMSettings()
+        else:
+            settings = {}
     return settings
+
+
+seq = MDASequence(time_plan={"interval": 0.1, "loops": 2},stage_positions=[(1, 1, 1)],z_plan={"range": 3, "step": 1},channels=[{"config": "DAPI", "exposure": 1}])

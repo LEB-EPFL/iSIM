@@ -31,6 +31,14 @@ class AcquisitionEngine(MDAEngine):
         self.running = Event()
 
     def setup_event(self, event: MDAEvent):
+        # We want the exposure set in the Channel to be the 'real' exposure,
+        # so we set the exposure of the event to None, so that it's not set in the MDAEngine setup
+        # The same might be necessary for the z position...
+        event_dict = event.model_dump()
+        event_dict['exposure'] = None
+        event = MDAEvent(**event_dict)
+        super().setup_event(event)
+
         try:
             next_event = next(self.internal_event_iterator)
         except StopIteration:
@@ -46,8 +54,6 @@ class AcquisitionEngine(MDAEngine):
             pass
         self.stream.write_many_sample(self.ni_data)
 
-        #TODO this does not work yet but might be needed for grids
-        # super().setup_event(event)
 
     def exec_event(self, event: MDAEvent):
         # Check that the camera has been asked to snap and start the generation on the DAQ
@@ -70,7 +76,7 @@ class AcquisitionEngine(MDAEngine):
         self.running.clear()
         if self.previous_exposure != self._mmc.getExposure():
             self._mmc.setExposure(self.previous_exposure)
-            print("EXPOSURE RESET", self.previous_exposure)
+            print("EXPOSURE RESET FOR LIVE", self.previous_exposure)
 
     def setup_sequence(self, sequence):
         # Potentially we could set up data for the whole sequence here
@@ -86,7 +92,7 @@ class AcquisitionEngine(MDAEngine):
 
     def adjust_camera_exposure(self, exposure):
         self.previous_exposure = self._mmc.getExposure()
-        print("CURRENT EXPOSURE", self.previous_exposure)
+        print("EXPOSURE SET FOR ACQ", self.previous_exposure)
         if self.previous_exposure != exposure:
             self._mmc.setExposure(exposure)
             self._mmc.waitForDevice(self.mmc.getCameraDevice())

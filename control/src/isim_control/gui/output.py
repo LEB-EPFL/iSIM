@@ -7,6 +7,7 @@ from isim_control.settings import iSIMSettings
 from isim_control.settings_translate import useq_from_settings, load_settings
 from isim_control.pubsub import Subscriber
 from isim_control.io.ome_tiff_writer import OMETiffWriter
+from isim_control.gui.save_button import SaveButton
 
 from qtpy.QtCore import QObject, Signal, QTimer
 import time
@@ -60,6 +61,8 @@ class OutputGUI(QObject):
         self.viewer = StackViewer(datastore=self.datastore, mmcore=self.mmc,
                                   sequence=useq_from_settings(self.settings),
                                   size=self.size, transform=self.transform)
+        self.save_button = SaveButton(self.datastore, self.viewer.sequence)
+        self.viewer.layout().addWidget(self.save_button)
         self.viewer.show()
 
     def _on_live_toggle(self, toggled):

@@ -1,18 +1,23 @@
-from pymmcore_widgets import GroupPresetTableWidget
+from pymmcore_widgets import StageWidget
 from pymmcore_plus import CMMCorePlus
-from qtpy.QtWidgets import QApplication, QWidget
+from qtpy.QtWidgets import QApplication
+from qtpy.QtCore import QObject
 
 mmc = CMMCorePlus()
-
-mmc.events.configSet.connect(lambda: print("config"))
-mmc.events.propertyChanged.connect(lambda: print("property"))
-
 app = QApplication([])
-widget = GroupPresetTableWidget(mmcore=mmc)
 
-
-
-mmc.loadSystemConfiguration('MMConfig_demo.cfg')
-
+mmc.loadSystemConfiguration("C:/iSIM/iSIM/mm-configs/pymmcore_plus.cfg")
+widget = StageWidget("MicroDrive XY Stage")
 widget.show()
+
+class EventReceiver(QObject):
+    def __init__(self, mmc):
+        super().__init__()
+        self.mmc = mmc
+        self.mmc.events.XYStagePositionChanged.connect(self.property)
+
+    def property(self, stage, pos):
+        print("new_pos", stage, pos)
+
+event_receiver = EventReceiver(mmc)
 app.exec_()

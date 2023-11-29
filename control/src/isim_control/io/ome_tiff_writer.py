@@ -28,6 +28,7 @@ class OMETiffWriter:
         # create an empty OME-TIFF file
         self._filename = filename
         self._mmap: None | np.memmap = None
+        self._current_sequence: None | useq.MDASequence = None
 
     def sequenceStarted(self, seq: useq.MDASequence) -> None:
         self._set_sequence(seq)

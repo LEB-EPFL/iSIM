@@ -32,7 +32,7 @@ class MainWindow(QMainWindowRestore):
         self.sub = Subscriber(['gui'], routes)
         self.running = False
 
-        self.setWindowTitle("MyMDA")
+        self.setWindowTitle("iSIM-Manager")
         self.main.setLayout(QGridLayout())
         self.live_button = QPushButton("Live")
         self.live_button.setIcon(fonticon.icon(MDI6.play_circle_outline, color="lime"))
@@ -84,7 +84,6 @@ class MainWindow(QMainWindowRestore):
         self.live_exposure.setValue(settings['live']['exposure'])
         self.live_exposure.valueChanged.connect(self._live_exposure_change)
 
-        self.setWindowTitle("MyMDA")
 
         self.channelBox.setLayout(QGridLayout())
         self.channelBox.layout().addWidget(self.live_488, 0, 0)
