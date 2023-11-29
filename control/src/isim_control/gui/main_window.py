@@ -310,9 +310,9 @@ if __name__ == "__main__":
     output = OutputGUI(mmc)
     broker.attach(output)
 
-    from isim_control.gui.position_history import PositionHistory
-    history = PositionHistory(mmc)
-    history.show()
+    # from isim_control.gui.position_history import PositionHistory
+    # history = PositionHistory(mmc)
+    # history.show()
 
     app.exec_()
     broker.stop()

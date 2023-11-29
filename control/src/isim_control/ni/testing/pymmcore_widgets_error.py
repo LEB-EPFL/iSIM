@@ -21,3 +21,10 @@ class EventReceiver(QObject):
 
 event_receiver = EventReceiver(mmc)
 app.exec_()
+
+# Problem with axis_order gtc not respecting interval  for later grid positions
+from useq import MDASequence
+seq = MDASequence(axis_order="gtc",time_plan={"interval": 0.1, "loops": 2},channels=[{"config": "DAPI", "exposure": 1}],grid_plan={"rows": 2, "columns": 2})
+
+# Problem with overlaps not implemented
+seq = MDASequence(grid_plan={"rows": 2, "columns": 2, "overlap": (0.2, 0.2)})

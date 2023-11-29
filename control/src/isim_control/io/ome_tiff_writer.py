@@ -27,8 +27,9 @@ class OMETiffWriter:
 
         # create an empty OME-TIFF file
         self._filename = filename
-        self._mmap: None | np.memmap = None
+        self._mmaps: None | np.memmap = None
         self._current_sequence: None | useq.MDASequence = None
+        self.n_grid_positions: int = 1
 
     def sequenceStarted(self, seq: useq.MDASequence) -> None:
         self._set_sequence(seq)
@@ -36,7 +37,7 @@ class OMETiffWriter:
     def frameReady(self, frame: np.ndarray, event: useq.MDAEvent, meta: dict) -> None:
         if event is None:
             return
-        if self._mmap is None:
+        if self._mmaps is None:
             if not self._current_sequence:
                 # just in case sequenceStarted wasn't called
                 self._set_sequence(event.sequence)  # pragma: no cover
@@ -46,9 +47,9 @@ class OMETiffWriter:
                     "Writing zarr without a MDASequence not yet implemented"
                 )
 
-            mmap = self._create_seq_memmap(frame, seq, meta)
+            mmap = self._create_seq_memmap(frame, seq, meta)[event.index.get("g", 0)]
         else:
-            mmap = self._mmap
+            mmap = self._mmaps[event.index.get("g", 0)]
 
         # WRITE DATA TO DISK
         index = tuple(event.index.get(k) for k in self._used_axes)
@@ -63,7 +64,9 @@ class OMETiffWriter:
         self._current_sequence = seq
         if seq:
             self._used_axes = tuple(seq.used_axes)
-
+            if 'g' in seq.used_axes:
+                self.n_grid_positions = seq.sizes['g']
+                self._used_axes = tuple(a for a in self._used_axes if a != 'g')
 
     def _create_seq_memmap(
         self, frame: np.ndarray, seq: useq.MDASequence, meta: dict
@@ -103,10 +106,20 @@ class OMETiffWriter:
         # over the course of the acquisition (such as stage positions, exposure times)
         # ... one option is to accumulate these things and then use `tifffile.comment`
         # to update the total metadata in sequenceFinished
-        imwrite(self._filename, shape=shape, dtype=dtype, metadata=metadata)
 
-        # memory map numpy array to data in OME-TIFF file
-        self._mmap = memmap(self._filename)
-        self._mmap = cast("np.memmap", self._mmap)
-        self._mmap = self._mmap.reshape(shape)
-        return self._mmap
+        self._mmaps = []
+        for g in range(self.n_grid_positions):
+            metadata["GridPosition"] = g
+            if self.n_grid_positions > 1:
+                filename = f"{self._filename}_g{str(g).zfill(2)}.ome.tiff"
+            else:
+                filename = f"{self._filename}.ome.tiff"
+            imwrite(filename, shape=shape, dtype=dtype, metadata=metadata)
+
+            # memory map numpy array to data in OME-TIFF file
+            _mmap = memmap(filename)
+            _mmap = cast("np.memmap", _mmap)
+            _mmap = _mmap.reshape(shape)
+            self._mmaps.append(_mmap)
+
+        return self._mmaps

@@ -27,15 +27,12 @@ def acquisition_settings_from_useq(settings: iSIMSettings, seq: MDASequence):
 def save_settings(settings: iSIMSettings|dict, filename: str = "settings"):
     # The interval in the time_plan settings is a timedelta, which is not JSON serializable
     try:
-        settings['acquisition']['time_plan']['interval'] = \
-            settings['acquisition']['time_plan']['interval'].seconds
-
+        settings['acquisition'] = serialize_acquisition(settings['acquisition'])
     except:
         pass
     path = Path.home() / ".isim" / f"{filename}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as file:
-        print(settings)
         file.write(json.dumps(settings, indent=2))
 
 
@@ -47,8 +44,7 @@ def load_settings(filename: str = "settings"):
         if settings_dict == {}:
             raise FileNotFoundError
         if filename == "settings":
-            settings_dict['acquisition']['time_plan']['interval'] = \
-                timedelta(seconds=settings_dict['acquisition']['time_plan']['interval'])
+            settings_dict['acquisition'] = deserialize_acquisition(settings_dict['acquisition'])
             settings = iSIMSettings(full_settings=settings_dict)
         else:
             settings = settings_dict
@@ -63,4 +59,23 @@ def load_settings(filename: str = "settings"):
     return settings
 
 
-seq = MDASequence(time_plan={"interval": 0.1, "loops": 2},stage_positions=[(1, 1, 1)],z_plan={"range": 3, "step": 1},channels=[{"config": "DAPI", "exposure": 1}])
+def serialize_acquisition(acquisition: dict):
+    """Converts the acquisition dict to a dict that can be serialized to JSON"""
+    try:
+        acquisition['time_plan']['interval'] = acquisition['time_plan']['interval'].seconds
+    except TypeError:
+        pass
+    try:
+        acquisition['grid_plan']['mode'] = acquisition['grid_plan']['mode'].name
+        acquisition['grid_plan']['relative_to'] = acquisition['grid_plan']['relative_to'].name
+    except TypeError:
+        pass
+    return acquisition
+
+def deserialize_acquisition(acquisition: dict):
+    try:
+        acquisition['time_plan']['interval'] = \
+            timedelta(seconds=acquisition['time_plan']['interval'])
+    except TypeError:
+        pass
+    return acquisition
