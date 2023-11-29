@@ -31,13 +31,8 @@ class AcquisitionEngine(MDAEngine):
         self.running = Event()
 
     def setup_event(self, event: MDAEvent):
-        # We want the exposure set in the Channel to be the 'real' exposure,
-        # so we set the exposure of the event to None, so that it's not set in the MDAEngine setup
-        # The same might be necessary for the z position...
-        event_dict = event.model_dump()
-        event_dict['exposure'] = None
-        event = MDAEvent(**event_dict)
-        super().setup_event(event)
+        sub_event = self._strip_event_properties(event)
+        super().setup_event(sub_event)
 
         try:
             next_event = next(self.internal_event_iterator)
@@ -97,6 +92,15 @@ class AcquisitionEngine(MDAEngine):
             self._mmc.setExposure(exposure)
             self._mmc.waitForDevice(self.mmc.getCameraDevice())
 
+
+    def _strip_event_properties(self, event):
+        """We want the exposure set in the Channel to be the 'real' exposure,
+           so we set the exposure of the event to None, so that it's not set in the MDAEngine setup
+           The same the z position..."""
+        event_dict = event.model_dump()
+        event_dict['exposure'] = None
+        event_dict['z_pos'] = None
+        return MDAEvent(**event_dict)
 
 class TimedAcquisitionEngine(AcquisitionEngine):
     def __init__(self, mmc: CMMCorePlus, device_group: NIDeviceGroup = None,
