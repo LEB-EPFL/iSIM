@@ -14,8 +14,8 @@ class iSIMMDAWidget(QWidgetRestore):
     def __init__(self, settings:dict, publisher, parent=None):
         super().__init__(parent=parent)
         self.mda = MDASequenceWidget()
-        self.mda.grid_plan._fov_height = 118
-        self.mda.grid_plan._fov_width = 118
+        self.mda.grid_plan._fov_height = 114.688
+        self.mda.grid_plan._fov_width = 114.688
         self.settings = settings
         self.lasers = LaserPowers(settings)
         self.isim = iSIMSettingsWidget()

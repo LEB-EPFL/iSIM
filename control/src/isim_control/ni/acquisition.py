@@ -31,6 +31,8 @@ class AcquisitionEngine(MDAEngine):
         self.running = Event()
 
     def setup_event(self, event: MDAEvent):
+        #TODO: If we want a z_offset for the LED channel, this might break it. We would then have
+        # handle that in the NI device.
         sub_event = self._strip_event_properties(event)
         super().setup_event(sub_event)
 

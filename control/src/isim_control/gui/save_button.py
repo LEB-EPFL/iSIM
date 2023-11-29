@@ -37,9 +37,10 @@ class SaveButton(QPushButton):
         shape = self.datastore.array.shape
         indeces = np.stack(np.meshgrid(range(shape[0]),
                                        range(shape[1]),
-                                       range(shape[2])), -1).reshape(-1, 3)
+                                       range(shape[2]),
+                                       range(shape[3])), -1).reshape(-1, 4)
         for index in indeces:
-            event_index = {'t': index[0], 'z': index[1], 'c': index[2]}
+            event_index = {'t': index[0], 'z': index[1], 'c': index[2], 'g': index[3]}
             #TODO: we should also save the event info in the datastore and the metadata.
             saver.frameReady(self.datastore.array[*index], MDAEvent(index=event_index, sequence=self.seq), {})
 
