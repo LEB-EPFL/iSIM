@@ -33,7 +33,10 @@ class AcquisitionEngine(MDAEngine):
     def setup_event(self, event: MDAEvent):
         #TODO: If we want a z_offset for the LED channel, this might break it. We would then have
         # handle that in the NI device.
-        sub_event = self._strip_event_properties(event)
+        sub_event = self._adjust_event_properties(event)
+        if self.use_filter_wheel:
+            self.mmc.setProperty("FilterWheel", "Label", sub_event.channel.config)
+            self.mmc.waitForDevice("FilterWheel")
         super().setup_event(sub_event)
 
         try:
@@ -76,13 +79,22 @@ class AcquisitionEngine(MDAEngine):
             print("EXPOSURE RESET FOR LIVE", self.previous_exposure)
 
     def setup_sequence(self, sequence):
-        # Potentially we could set up data for the whole sequence here
         self.sequence = copy.deepcopy(sequence)
+        # This we will use to know about the next event (setting z_position for example)
         self.internal_event_iterator = self.sequence.iter_events()
         next(self.internal_event_iterator)
-        self._mmc.setPosition(self.settings['ni']['relative_z'])
-        # Adjust the exposure time
+        self._mmc.setPosition(min(self.settings['ni']['relative_z'], 202))
+        self.use_filter_wheel = self.settings['use_filters']
+        if self.use_filter_wheel:
+            self.start_filter = self.mmc.getProperty("FilterWheel", "Label")
+        self.start_xy_position = self._mmc.getXYPosition()
         self.running.set()
+
+    def teardown_sequence(self, sequence):
+        # Reset the position, important for grid plan
+        self._mmc.setXYPosition(*self.start_xy_position)
+        if self.use_filter_wheel:
+            self.mmc.setProperty("FilterWheel", "Label", self.start_filter)
 
     def update_settings(self, settings):
         self.settings = settings
@@ -94,14 +106,16 @@ class AcquisitionEngine(MDAEngine):
             self._mmc.setExposure(exposure)
             self._mmc.waitForDevice(self.mmc.getCameraDevice())
 
-
-    def _strip_event_properties(self, event):
+    def _adjust_event_properties(self, event):
         """We want the exposure set in the Channel to be the 'real' exposure,
            so we set the exposure of the event to None, so that it's not set in the MDAEngine setup
            The same the z position..."""
         event_dict = event.model_dump()
         event_dict['exposure'] = None
         event_dict['z_pos'] = None
+        if self.start_xy_position and event_dict['x_pos']:
+            event_dict['x_pos'] = event_dict['x_pos'] + self.start_xy_position[0]
+            event_dict['y_pos'] = event_dict['y_pos'] + self.start_xy_position[1]
         return MDAEvent(**event_dict)
 
 class TimedAcquisitionEngine(AcquisitionEngine):

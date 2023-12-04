@@ -114,6 +114,7 @@ class OMETiffWriter:
                 filename = f"{self._filename}_g{str(g).zfill(2)}.ome.tiff"
             else:
                 filename = f"{self._filename}.ome.tiff"
+
             imwrite(filename, shape=shape, dtype=dtype, metadata=metadata)
 
             # memory map numpy array to data in OME-TIFF file
@@ -121,5 +122,10 @@ class OMETiffWriter:
             _mmap = cast("np.memmap", _mmap)
             _mmap = _mmap.reshape(shape)
             self._mmaps.append(_mmap)
-
         return self._mmaps
+
+    def __del__(self):
+        print("DELETING WRITER DATA")
+        for mmap in self._mmaps:
+            mmap.flush()
+            del mmap

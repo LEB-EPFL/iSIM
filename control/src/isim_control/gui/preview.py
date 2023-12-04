@@ -57,7 +57,7 @@ class iSIMPreview(QWidgetRestore):
                 print(traceback.format_exc())
 
     def collapse_view(self):
-        self.preview.view.camera.set_range()
+        self.preview.view.camera.set_range(margin=0)
 
     def closeEvent(self, event):
         settings = {"path": str(self.save_loc),

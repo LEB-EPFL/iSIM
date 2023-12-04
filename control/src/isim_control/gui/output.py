@@ -31,6 +31,8 @@ class OutputGUI(QObject):
                           view_settings.get("mirror_y", True))
         self.last_live_stop = time.perf_counter()
 
+        self.viewer = None
+
     def _on_settings_change(self, keys, value):
         self.settings.set_by_path(keys, value)
 
@@ -38,6 +40,8 @@ class OutputGUI(QObject):
         self.acquisition_started.emit()
 
     def make_viewer(self):
+        if self.viewer:
+            del self.viewer
         sequence: MDASequence = useq_from_settings(self.settings)
         sizes = sequence.sizes
         shape = [sizes.get('t', 1),
@@ -55,7 +59,6 @@ class OutputGUI(QObject):
         self.size = (self.mmc.getImageHeight(), self.mmc.getImageWidth())
         delay = int(max(0, 1200 - (time.perf_counter() - self.last_live_stop)*1000))
         self.timer = QTimer.singleShot(delay, self.create_viewer)
-        # print("Delaying viewer creation by", delay, "ms")
 
     def create_viewer(self):
 
@@ -63,7 +66,7 @@ class OutputGUI(QObject):
                                   sequence=useq_from_settings(self.settings),
                                   size=self.size, transform=self.transform)
         self.save_button = SaveButton(self.datastore, self.viewer.sequence)
-        self.viewer.layout().addWidget(self.save_button)
+        self.viewer.bottom_buttons.addWidget(self.save_button)
         self.viewer.show()
 
     def _on_live_toggle(self, toggled):

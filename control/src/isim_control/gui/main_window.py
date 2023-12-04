@@ -3,6 +3,7 @@ from qtpy.QtWidgets import (QApplication, QPushButton, QWidget, QGridLayout, QGr
 from qtpy.QtCore import Qt, Signal, QTimer
 
 from pymmcore_widgets import GroupPresetTableWidget, StageWidget
+from pymmcore_widgets._device_property_table import DevicePropertyTable
 from superqt import QLabeledSlider, fonticon
 from isim_control.gui.dark_theme import slider_theme
 from isim_control.gui.dark_theme import set_dark
@@ -103,6 +104,9 @@ class MainWindow(QMainWindowRestore):
         self.main.layout().addWidget(self.exp_label, 2, 2, 1, 2)
         self.main.layout().addWidget(self.live_exposure, 3, 2, 1, 2)
 
+        self.device_menu = self.menuBar().addMenu("Devices")
+        self.device_prop_table = DevicePropertyTable()
+        self.device_menu.addAction("Device Properties").triggered.connect(self._device_properties)
 
         self.main.layout().addWidget(self.channelBox, 0, 1, 4, 1)
 
@@ -113,7 +117,11 @@ class MainWindow(QMainWindowRestore):
         self.live_power_561.installEventFilter(self)
         self.live_power_led.installEventFilter(self)
 
-
+    def _device_properties(self):
+        if not self.device_prop_table.isVisible():
+            self.device_prop_table.show()
+        else:
+            self.device_prop_table.hide()
 
     def _mda(self):
         self.mda_window.show()
