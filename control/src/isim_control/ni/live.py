@@ -133,7 +133,8 @@ class LiveTimer(Timer):
             self.snapping.set()
             self._mmc.snapImage()
             self.snapping.clear()
-            self._mmc.events.liveFrameReady.emit(self._mmc.getImage(fix=False), None,
+            self._mmc.events.liveFrameReady.emit(self._mmc.getImage(fix=False),
+                                                 self.settings['channel'],
                                                  self._mmc.getTags())
         except Exception as e:
             #print(e)

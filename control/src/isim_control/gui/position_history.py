@@ -85,7 +85,7 @@ class PositionHistory(QtWidgets.QGraphicsView):
         self.mmc.mda.events.frameReady.connect(self.frame_ready)
         self.mmc.events.liveFrameReady.connect(self.frame_ready)
         self.increase_values_signal.connect(self.increase_values)
-        print(self.mmc)
+
 
     def frame_ready(self, frame, event, metadata):
         self.increase_values_signal.emit(frame, event, metadata)
