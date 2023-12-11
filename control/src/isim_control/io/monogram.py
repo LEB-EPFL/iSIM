@@ -3,6 +3,7 @@ import time
 from psygnal import Signal
 from threading import Thread
 from pymmcore_plus import CMMCorePlus
+from isim_control.pubsub import Publisher
 
 CUTOFF_SPEEDUP = 80 # This is 1/ms for last value change
 # CUTOFF_SPEEDDOWN = 5
@@ -11,11 +12,12 @@ MAX_POSITION = 202 #um
 
 class MonogramCC():
 
-    def __init__(self, mmcore: CMMCorePlus):
+    def __init__(self, mmcore: CMMCorePlus, publisher: Publisher = None):
         super().__init__()
         pygame.init()
         self.init_controller()
         self._mmc = mmcore
+        self.pub = publisher
         self.thread = Thread(target=self.start_listener, args=(self.device,))
         self.thread.start()
 
@@ -30,7 +32,19 @@ class MonogramCC():
     def start_listener(self, device):
         self.listener = self.Listener(device, self._mmc)
         self.listener.new_pos_event.connect(self._mmc.setPosition)
+        self.listener.stop_live_event.connect(self._stop_live)
+        self.listener.laser_intensity_event.connect(self._laser_intensity)
+        self.listener.activate_channel_event.connect(self._channel_activate)
         self.listener.start()
+
+    def _stop_live(self):
+        self.pub.publish("gui", "live_button_clicked", [False])
+
+    def _laser_intensity(self, laser, value):
+        self.pub.publish("gui", "laser_intensity_changed", [laser, value])
+
+    def _channel_activate(self, channel):
+        self.pub.publish("gui", "channel_activated", [channel])
 
     def stop(self):
         self.listener.stop()
@@ -38,6 +52,9 @@ class MonogramCC():
 
     class Listener():
         new_pos_event = Signal(float)
+        stop_live_event = Signal()
+        laser_intensity_event = Signal(int, float)
+        activate_channel_event = Signal(str)
         def __init__(self, device, mmcore: CMMCorePlus):
             super().__init__()
             self._device = device
@@ -54,6 +71,7 @@ class MonogramCC():
             self.turn = 0
             self.total_relative_move = 0
             self.last_send = time.perf_counter()
+            self.laser_int = [self._device.get_axis(i) for i in range(1,4)]
 
             self.stop_requested = False
 
@@ -61,17 +79,31 @@ class MonogramCC():
             while not self.stop_requested:
                 event = pygame.event.wait(timeout=500)
                 if event.type == 1536:  # AxisMotion
-                    if event.axis == 0:
+                    if event.axis == 0: #Big wheel
                         self.updatePos(event.value)
+                    if event.axis in [1, 2, 3]: #Laser
+                        increment = event.value - self.laser_int[event.axis-1]
+                        if increment > 5 or increment < -5:
+                            break
+                        value = 1 if increment > 0 else -1
+                        self.laser_intensity_event.emit(event.axis, value)
+                        self.laser_int[event.axis-1] = event.value
                 if event.type == 1540:  # ButtonUp
-                    print(event.button)
-                    if event.button == 0:
-                        pygame.quit()
-                        break
-                    if event.button == 1:
-                        self.resetPos()
-                    if event.button == 2:
-                        self.monogram_stop_live_event.emit()
+                    match event.button:
+                        case 0:
+                            pygame.quit()
+                            break
+                        case 1:
+                            self.resetPos()
+                        case 2:
+                            self.stop_live_event.emit()
+                        case 3:
+                            self.activate_channel_event.emit("488")
+                        case 4:
+                            self.activate_channel_event.emit("561")
+                        case 5:
+                            self.activate_channel_event.emit("led")
+
 
         def resetPos(self):
             self.z_pos = 0
