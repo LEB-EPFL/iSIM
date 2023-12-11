@@ -103,9 +103,9 @@ class LiveTimer(Timer):
         while not self.finished.wait(self.interval):
             if self.stop_event.is_set() and not self.snap_mode:
                 break
-            self.snap_lock.acquire()
             #print("live_running")
             thread = Thread(target=self.snap_and_get)
+            self.snap_lock.acquire()
             thread.start()
             self.task.write(self.one_frame())
             self.snap_lock.acquire()

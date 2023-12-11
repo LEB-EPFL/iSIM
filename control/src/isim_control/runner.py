@@ -1,5 +1,5 @@
 from pymmcore_plus import CMMCorePlus
-from pymmcore_plus.mda import mda_listeners_connected
+# from pymmcore_plus.mda import mda_listeners_connected
 from isim_control.pubsub import Subscriber, Publisher
 from isim_control.settings import iSIMSettings
 from isim_control.ni import live, acquisition, devices

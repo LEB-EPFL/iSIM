@@ -12,7 +12,8 @@ dependencies = [
     'superqt[cmap]',
     'scipy',
     'vispy',
-    'pygame'
+    'pygame',
+    'pyyaml'
 ]
 
 [project.optional-dependencies]

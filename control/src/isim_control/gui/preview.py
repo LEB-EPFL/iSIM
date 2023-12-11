@@ -15,7 +15,8 @@ from isim_control.settings_translate import load_settings, save_settings
 from isim_control.gui.assets.qt_classes import QWidgetRestore
 
 class iSIMPreview(QWidgetRestore):
-    def __init__(self, parent: QWidget | None = None, mmcore: CMMCorePlus | None = None):
+    def __init__(self, parent: QWidget | None = None, mmcore: CMMCorePlus | None = None,
+                 key_listener: QObject | None = None):
         super().__init__(parent=parent)
         self._mmc = mmcore
         self.current_frame = None
@@ -45,6 +46,10 @@ class iSIMPreview(QWidgetRestore):
         self.layout().addWidget(self.save_btn, 1, 0)
         self.layout().addWidget(self.collapse_btn, 1, 4)
 
+        if key_listener:
+            self.key_listener = key_listener
+            self.installEventFilter(self.key_listener)
+
     def new_frame(self, image, event, meta):
         self.current_frame = image
 
@@ -68,6 +73,7 @@ class iSIMPreview(QWidgetRestore):
                     "mirror_y": self.mirror_y}
         save_settings(settings, "live_view")
         super().closeEvent(event)
+
 
 
 class Canvas(QWidget):
