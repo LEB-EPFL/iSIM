@@ -1,6 +1,6 @@
 from qtpy.QtWidgets import (QApplication, QPushButton, QWidget, QGridLayout, QGroupBox,
                             QRadioButton, QSpinBox, QLabel, QCheckBox, QMainWindow)
-from qtpy.QtCore import Qt, Signal, QTimer
+from qtpy.QtCore import Qt, Signal, QTimerEvent, QObject, QTimer
 
 from pymmcore_widgets import GroupPresetTableWidget, StageWidget
 from pymmcore_widgets._device_property_table import DevicePropertyTable
@@ -17,7 +17,8 @@ from fonticon_mdi6 import MDI6
 
 
 class MainWindow(QMainWindowRestore):
-    def __init__(self, publisher:Publisher, settings: dict = {}):
+    def __init__(self, publisher:Publisher, settings: dict = {},
+                 key_listener: QObject | None = None):
         super().__init__()
         self.pub = publisher
         self.settings = settings
@@ -29,6 +30,9 @@ class MainWindow(QMainWindowRestore):
                                         publisher=self.pub)
 
         routes = {"acquisition_finished": [lambda: self.mda_window.run_buttons._on_cancel_clicked(True)],
+                  "live_button_clicked": [self._on_live_toggle_event],
+                  "laser_intensity_changed": [self._on_laser_intensity_changed],
+                  "channel_activated": [self._on_channel_activated],
                   }
         self.sub = Subscriber(['gui'], routes)
         self.running = False
@@ -117,6 +121,49 @@ class MainWindow(QMainWindowRestore):
         self.live_power_561.installEventFilter(self)
         self.live_power_led.installEventFilter(self)
 
+        if key_listener:
+            key_listener.installEventFilter(key_listener)
+
+    def _on_channel_activated(self, channel:str):
+        if channel == "488":
+            obj = self.live_power_488
+        elif channel == "561":
+            obj = self.live_power_561
+        elif channel == "led":
+            obj = self.live_power_led
+        sliders = [self.live_power_488, self.live_power_561, self.live_power_led]
+        radios = [self.live_488, self.live_561, self.live_led]
+        for slider, radio in zip(sliders, radios):
+            if obj == slider:
+                slider.setDisabled(False)
+                radio.setChecked(True)
+            else:
+                slider.setDisabled(True)
+
+
+    def _on_laser_intensity_changed(self, channel, value):
+        if channel == 1:
+            current = self.live_power_488.value()
+            future = max(self.live_power_488.minimum(),
+                         min([current + value, self.live_power_488.maximum()]))
+            self.live_power_488.setValue(int(future))
+        elif channel == 2:
+            current = self.live_power_561.value()
+            self.live_power_561.setValue(int(current + value))
+        elif channel == 3:
+            current = self.live_power_led.value()
+            self.live_power_led.setValue(int(current + value))
+
+    def _on_live_toggle_event(self, toggle):
+        if toggle:
+            self.live_button.setText("Pause")
+            self.live_button.setIcon(fonticon.icon(MDI6.pause_circle_outline, color="red"))
+            self.running = True
+        else:
+            self.live_button.setText("Live")
+            self.live_button.setIcon(fonticon.icon(MDI6.play_circle_outline, color="lime"))
+            self.running = False
+
     def _device_properties(self):
         if not self.device_prop_table.isVisible():
             self.device_prop_table.show()
@@ -176,12 +223,12 @@ class MainWindow(QMainWindowRestore):
     def _live(self):
         if not self.running:
             self.pub.publish("gui", "live_button_clicked", [True])
-            self.live_button.setText("Pause")
-            self.live_button.setIcon(fonticon.icon(MDI6.pause_circle_outline, color="red"))
+            # self.live_button.setText("Pause")
+            # self.live_button.setIcon(fonticon.icon(MDI6.pause_circle_outline, color="red"))
         else:
             self.pub.publish("gui", "live_button_clicked", [False])
-            self.live_button.setText("Live")
-            self.live_button.setIcon(fonticon.icon(MDI6.play_circle_outline, color="lime"))
+            # self.live_button.setText("Live")
+            # self.live_button.setIcon(fonticon.icon(MDI6.play_circle_outline, color="lime"))
         self.running = not self.running
 
     def _snap(self):
@@ -219,7 +266,7 @@ class MainWindow(QMainWindowRestore):
 
 
 class iSIM_StageWidget(QWidgetRestore):
-    def __init__(self, mmc):
+    def __init__(self, mmc, key_listener: QObject | None = None):
         super().__init__()
         self.stage1 = StageWidget("MicroDrive XY Stage", mmcore=mmc)
         self.stage1._step.setValue(25)
@@ -232,6 +279,9 @@ class iSIM_StageWidget(QWidgetRestore):
         self.layout().addWidget(self.stage1, 2, 0)
         self.layout().addWidget(self.stage2, 2, 1)
 
+        if key_listener:
+            self.installEventFilter(key_listener)
+
 
 if __name__ == "__main__":
     # from isim_control.settings import iSIMSettings
@@ -240,6 +290,7 @@ if __name__ == "__main__":
     from isim_control.runner import iSIMRunner
     from isim_control.ni import live, acquisition, devices
     from pymmcore_plus import CMMCorePlus
+
     monogram = False
     app = QApplication([])
     set_dark(app)
@@ -257,6 +308,10 @@ if __name__ == "__main__":
 
     settings = load_settings()
     isim_devices = devices.NIDeviceGroup(settings=settings)
+
+
+    from isim_control.io.keyboard import KeyboardListener
+    # key_listener = KeyboardListener(mmc=mmc)
 
     try:
         from isim_control.io.monogram import MonogramCC
@@ -277,8 +332,8 @@ if __name__ == "__main__":
                                       device_group=isim_devices)
         mmc.mda.set_engine(acq_engine)
 
-        monogram = MonogramCC(mmcore=mmc)
-        stages = iSIM_StageWidget(mmc)
+        monogram = MonogramCC(mmcore=mmc, publisher=Publisher(broker.pub_queue))
+        stages = iSIM_StageWidget(mmc, key_listener=KeyboardListener(mmc=mmc))
         stages.show()
     except FileNotFoundError:
         from unittest.mock import MagicMock
@@ -290,8 +345,9 @@ if __name__ == "__main__":
         stage = StageWidget("XY", mmcore=mmc)
         stage.show()
 
+
     from isim_control.gui.preview import iSIMPreview
-    preview = iSIMPreview(mmcore=mmc)
+    preview = iSIMPreview(mmcore=mmc, key_listener=KeyboardListener(mmc=mmc))
     preview.show()
 
     runner = iSIMRunner(mmc,
@@ -305,7 +361,7 @@ if __name__ == "__main__":
     default_settings = copy.deepcopy(settings)
 
     #GUI
-    frame = MainWindow(Publisher(broker.pub_queue), settings)
+    frame = MainWindow(Publisher(broker.pub_queue), settings, key_listener=KeyboardListener(mmc=mmc))
     broker.attach(frame)
     frame.update_from_settings(default_settings)
 
@@ -318,9 +374,9 @@ if __name__ == "__main__":
     output = OutputGUI(mmc)
     broker.attach(output)
 
-    # from isim_control.gui.position_history import PositionHistory
-    # history = PositionHistory(mmc)
-    # history.show()
+    from isim_control.gui.position_history import PositionHistory
+    history = PositionHistory(mmc, key_listener=KeyboardListener(mmc=mmc))
+    history.show()
 
     app.exec_()
     broker.stop()
