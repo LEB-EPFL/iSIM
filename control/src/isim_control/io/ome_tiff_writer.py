@@ -7,26 +7,31 @@ from __future__ import annotations
 
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any, cast
+from pathlib import Path
+import yaml
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     import numpy as np
     import useq
 
 
 class OMETiffWriter:
-    def __init__(self, filename: Path | str) -> None:
+    def __init__(self, folder: Path | str, settings:dict | None = None,
+                 mm_config: dict|None = None) -> None:
         try:
             import tifffile  # noqa: F401
+            import yaml
         except ImportError as e:  # pragma: no cover
             raise ImportError(
-                "tifffile is required to use this handler. "
-                "Please `pip install tifffile`."
+                "tifffile and yaml is required to use this handler. "
+                "Please `pip install tifffile`. and pyyaml"
             ) from e
 
         # create an empty OME-TIFF file
-        self._filename = filename
+        self._folder = Path(folder)
+        self._settings = settings
+        self._mm_config = mm_config
+
         self._mmaps: None | np.memmap = None
         self._current_sequence: None | useq.MDASequence = None
         self.n_grid_positions: int = 1
@@ -61,12 +66,20 @@ class OMETiffWriter:
 
     def _set_sequence(self, seq: useq.MDASequence | None) -> None:
         """Set the current sequence, and update the used axes."""
+        self._folder.mkdir(parents=True, exist_ok=True)
         self._current_sequence = seq
         if seq:
             self._used_axes = tuple(seq.used_axes)
             if 'g' in seq.used_axes:
                 self.n_grid_positions = seq.sizes['g']
                 self._used_axes = tuple(a for a in self._used_axes if a != 'g')
+        if self._settings:
+            with open(self._folder/'isim_settings.yaml', 'w') as outfile:
+                yaml.dump(self._settings, outfile, default_flow_style=False)
+        if self._mm_config:
+            with open(self._folder/'mm_config.txt', 'w') as outfile:
+                yaml.dump(self._mm_config, outfile, default_flow_style=False)
+
 
     def _create_seq_memmap(
         self, frame: np.ndarray, seq: useq.MDASequence, meta: dict
@@ -111,14 +124,14 @@ class OMETiffWriter:
         for g in range(self.n_grid_positions):
             metadata["GridPosition"] = g
             if self.n_grid_positions > 1:
-                filename = f"{self._filename}_g{str(g).zfill(2)}.ome.tiff"
+                filename = f"{self._folder.parts[-1]}_g{str(g).zfill(2)}.ome.tiff"
             else:
-                filename = f"{self._filename}.ome.tiff"
+                filename = f"{self._folder.parts[-1]}.ome.tiff"
 
-            imwrite(filename, shape=shape, dtype=dtype, metadata=metadata)
+            imwrite(Path(self._folder)/filename, shape=shape, dtype=dtype, metadata=metadata)
 
             # memory map numpy array to data in OME-TIFF file
-            _mmap = memmap(filename)
+            _mmap = memmap(Path(self._folder)/filename)
             _mmap = cast("np.memmap", _mmap)
             _mmap = _mmap.reshape(shape)
             self._mmaps.append(_mmap)

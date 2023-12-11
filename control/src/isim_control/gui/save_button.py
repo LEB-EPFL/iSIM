@@ -17,6 +17,8 @@ class SaveButton(QPushButton):
     def __init__(self,
                  datastore:QLocalDataStore,
                  seq: MDASequence|None = None,
+                 settings: dict | None = None,
+                 mm_config: str | None = None,
                  parent: QWidget | None = None):
 
         super().__init__(parent=parent)
@@ -30,10 +32,12 @@ class SaveButton(QPushButton):
         self.save_loc = settings.get("path", Path.home())
         self.datastore = datastore
         self.seq = seq
+        self.settings = settings
+        self.mm_config = mm_config
 
     def on_click(self):
         self.save_loc, _ = QFileDialog.getSaveFileName(directory=self.save_loc)
-        saver = OMETiffWriter(self.save_loc)
+        saver = OMETiffWriter(self.save_loc, self.settings, self.mm_config)
         shape = self.datastore.array.shape
         indeces = np.stack(np.meshgrid(range(shape[0]),
                                        range(shape[1]),
@@ -43,6 +47,10 @@ class SaveButton(QPushButton):
             event_index = {'t': index[0], 'z': index[1], 'c': index[2], 'g': index[3]}
             #TODO: we should also save the event info in the datastore and the metadata.
             saver.frameReady(self.datastore.array[*index], MDAEvent(index=event_index, sequence=self.seq), {})
+
+    def __del__(self):
+        settings = {"path": str(self.save_loc)}
+        save_settings(settings, "stack_view")
 
     def closeEvent(self, a0: QCloseEvent | None) -> None:
         settings = {"path": str(self.save_loc)}

@@ -31,6 +31,7 @@ class OutputGUI(QObject):
                           view_settings.get("mirror_y", True))
         self.last_live_stop = time.perf_counter()
 
+        self.mm_config = None
         self.viewer = None
 
     def _on_settings_change(self, keys, value):
@@ -43,6 +44,7 @@ class OutputGUI(QObject):
         if self.viewer:
             del self.viewer
         sequence: MDASequence = useq_from_settings(self.settings)
+        self.mm_config = self.mmc.getSystemState().dict()
         sizes = sequence.sizes
         shape = [sizes.get('t', 1),
                     sizes.get('z', 1),
@@ -52,7 +54,7 @@ class OutputGUI(QObject):
                     self.mmc.getImageWidth()]
         self.datastore = QLocalDataStore(shape, mmcore=self.mmc)
         if self.settings['save']:
-            self.writer = OMETiffWriter(self.settings['path'])
+            self.writer = OMETiffWriter(self.settings['path'], self.settings, self.mm_config)
             self.writer.sequenceStarted(sequence)
             self.mmc.mda.events.frameReady.connect(self.writer.frameReady)
         # Delay the creation of the viewer so that the preview can finish
@@ -61,11 +63,11 @@ class OutputGUI(QObject):
         self.timer = QTimer.singleShot(delay, self.create_viewer)
 
     def create_viewer(self):
-
         self.viewer = StackViewer(datastore=self.datastore, mmcore=self.mmc,
                                   sequence=useq_from_settings(self.settings),
                                   size=self.size, transform=self.transform)
-        self.save_button = SaveButton(self.datastore, self.viewer.sequence)
+        self.save_button = SaveButton(self.datastore, self.viewer.sequence, self.settings,
+                                      self.mm_config)
         self.viewer.bottom_buttons.addWidget(self.save_button)
         self.viewer.show()
 
