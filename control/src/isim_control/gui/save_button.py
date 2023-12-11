@@ -48,10 +48,6 @@ class SaveButton(QPushButton):
             #TODO: we should also save the event info in the datastore and the metadata.
             saver.frameReady(self.datastore.array[*index], MDAEvent(index=event_index, sequence=self.seq), {})
 
-    def __del__(self):
-        settings = {"path": str(self.save_loc)}
-        save_settings(settings, "stack_view")
-
     def closeEvent(self, a0: QCloseEvent | None) -> None:
         settings = {"path": str(self.save_loc)}
         save_settings(settings, "stack_view")

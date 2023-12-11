@@ -1,4 +1,5 @@
 from pymmcore_widgets.useq_widgets._mda_sequence import MDASequenceWidget
+from isim_control.pubsub import Subscriber
 from qtpy.QtWidgets import (QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QCheckBox,
                             QSizePolicy, QGridLayout, QLineEdit, QPushButton)
 from qtpy.QtCore import Qt
@@ -14,6 +15,7 @@ class iSIMMDAWidget(QWidgetRestore):
     def __init__(self, settings:dict, publisher, parent=None):
         super().__init__(parent=parent)
         self.mda = MDASequenceWidget()
+        self.mda.tab_wdg.removeTab(self.mda.tab_wdg.indexOf(self.mda.stage_positions))
         self.mda.grid_plan._fov_height = 114.688
         self.mda.grid_plan._fov_width = 114.688
         self.settings = settings
@@ -32,6 +34,28 @@ class iSIMMDAWidget(QWidgetRestore):
         self.layout().addWidget(self.save_settings)
         self.layout().addWidget(self.run_buttons)
         self.mda.setValue(useq_from_settings(settings))
+        for key, value in settings.get('use_plan', {}).items():
+            match key:
+                case 'time_plan':
+                    self.mda.tab_wdg.setChecked(self.mda.time_plan, value)
+                case 'grid_plan':
+                    self.mda.tab_wdg.setChecked(self.mda.grid_plan, value)
+                case 'z_plan':
+                    self.mda.tab_wdg.setChecked(self.mda.z_plan, value)
+                case 'channels':
+                    self.mda.tab_wdg.setChecked(self.mda.channels, value)
+        table = self.mda.channels.table()
+        column_info = table.columnInfo(table._get_selector_col())
+        use_channels = settings.get('use_channels', {'488': True, '561': True, 'LED': False})
+        for idx, (key, value) in enumerate(use_channels.items()):
+            check_value = Qt.CheckState.Checked if value else Qt.CheckState.Unchecked
+            match key:
+                case '488':
+                    column_info.setCheckState(table, idx, table._get_selector_col(), check_value)
+                case '561':
+                    column_info.setCheckState(table, idx, table._get_selector_col(), check_value)
+                case 'LED':
+                    column_info.setCheckState(table, idx, table._get_selector_col(), check_value)
 
     def setValue(self, settings: dict):
         seq = useq_from_settings(settings)
@@ -164,8 +188,22 @@ class SaverWidget(QWidget):
         self.setLayout(QGridLayout())
         self.save = QCheckBox("Save to:")
         self.layout().addWidget(self.save)
-        self.path = QLineEdit("C:/Users/stepp/Desktop/OMETIFF.ome.tiff")
+        self.path = QLineEdit("C:/Users/stepp/Desktop/OMETIFF_000")
         self.layout().addWidget(self.path)
+        routes = {"acquisition_finished": [self._increase_folder_number]}
+        self.sub = Subscriber(["gui"], routes)
+
+    def _increase_folder_number(self):
+        path = self.path.text()
+        path = path.split("_")
+        try:
+            num = int(path[-1])
+            path[-1] = str(num+1).zfill(3)
+        except ValueError:
+            num = 0
+            path.append("000")
+        path = "_".join(path)
+        self.path.setText(path)
 
     def get_state(self):
         return (

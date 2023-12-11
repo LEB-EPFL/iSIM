@@ -1,12 +1,12 @@
-from qtpy.QtWidgets import (QApplication, QPushButton, QWidget, QGridLayout, QGroupBox,
-                            QRadioButton, QSpinBox, QLabel, QCheckBox, QMainWindow)
-from qtpy.QtCore import Qt, Signal, QTimerEvent, QObject, QTimer
+from qtpy.QtWidgets import (QPushButton, QWidget, QGridLayout, QGroupBox,
+                            QRadioButton, QSpinBox, QLabel, QCheckBox, )
+from qtpy.QtCore import Qt,QObject, QTimer
 
 from pymmcore_widgets import GroupPresetTableWidget, StageWidget
 from pymmcore_widgets._device_property_table import DevicePropertyTable
 from superqt import QLabeledSlider, fonticon
 from isim_control.gui.dark_theme import slider_theme
-from isim_control.gui.dark_theme import set_dark
+
 from isim_control.gui.assets.qt_classes import QMainWindowRestore, QWidgetRestore
 
 from isim_control.pubsub import Subscriber, Publisher
@@ -250,6 +250,29 @@ class MainWindow(QMainWindowRestore):
         else:
             self.live_led.setChecked(True)
 
+    def get_full_settings(self, settings:dict):
+        mda_widget = self.mda_window.mda
+        settings['acquisition']['time_plan'] = mda_widget.time_plan.value().model_dump()
+        settings['acquisition']['grid_plan'] = mda_widget.grid_plan.value().model_dump()
+        settings['acquisition']['z_plan'] = mda_widget.z_plan.value().model_dump()
+        channels = []
+        settings['use_channels'] = {}
+        table = mda_widget.channels.table()
+        for idx, channel in enumerate(mda_widget.channels.value(exclude_unchecked=False)):
+            channels.append(channel.model_dump())
+            use_channel = (table.columnInfo(table._get_selector_col()).
+                           isChecked(table, idx, table._get_selector_col()))
+            settings['use_channels'][channel.config] = use_channel
+
+        channels = tuple(channels)
+        settings['acquisition']['channels'] = channels
+        settings['use_plan'] = {'time_plan': mda_widget.tab_wdg.isAxisUsed('t'),
+                                'grid_plan': mda_widget.tab_wdg.isAxisUsed('g'),
+                                'z_plan': mda_widget.tab_wdg.isAxisUsed('z'),
+                                'channels': mda_widget.tab_wdg.isAxisUsed('c')}
+        return settings
+
+
     def eventFilter(self, obj, event):
         # Enable sliders by clicking
         sliders = [self.live_power_488, self.live_power_561, self.live_power_led]
@@ -281,106 +304,3 @@ class iSIM_StageWidget(QWidgetRestore):
 
         if key_listener:
             self.installEventFilter(key_listener)
-
-
-if __name__ == "__main__":
-    # from isim_control.settings import iSIMSettings
-    from isim_control.settings_translate import save_settings, load_settings
-    from isim_control.pubsub import Publisher, Broker
-    from isim_control.runner import iSIMRunner
-    from isim_control.ni import live, acquisition, devices
-    from pymmcore_plus import CMMCorePlus
-
-    monogram = False
-    app = QApplication([])
-    set_dark(app)
-
-    broker = Broker()
-
-    mmc = CMMCorePlus.instance()
-    #This is hacky, might just want to make our own preview
-    events_class = mmc.events.__class__
-    new_cls = type(
-        events_class.__name__, events_class.__bases__,
-        {**events_class.__dict__, 'liveFrameReady': Signal(object, object, dict)},
-    )
-    mmc.events.__class__ = new_cls
-
-    settings = load_settings()
-    isim_devices = devices.NIDeviceGroup(settings=settings)
-
-
-    from isim_control.io.keyboard import KeyboardListener
-    # key_listener = KeyboardListener(mmc=mmc)
-
-    try:
-        from isim_control.io.monogram import MonogramCC
-        mmc.loadSystemConfiguration("C:/iSIM/iSIM/mm-configs/pymmcore_plus.cfg")
-        mmc.setCameraDevice("PrimeB_Camera")
-        mmc.setProperty("PrimeB_Camera", "TriggerMode", "Edge Trigger")
-        mmc.setProperty("PrimeB_Camera", "ReadoutRate", "100MHz 16bit")
-        mmc.setProperty("Sapphire", "State", 1)
-        mmc.setProperty("Quantum_561nm", "Laser Operation", "On")
-        mmc.setProperty("MCL NanoDrive Z Stage", "Settling time (ms)", 30)
-        mmc.setXYStageDevice("MicroDrive XY Stage")
-        mmc.setExposure(settings['camera']['exposure']*1000)
-        mmc.setAutoShutter(False)
-
-        #Backend
-        acq_engine = acquisition.AcquisitionEngine(mmc, isim_devices, settings)
-        live_engine = live.LiveEngine(task=acq_engine.task, mmcore=mmc, settings=settings,
-                                      device_group=isim_devices)
-        mmc.mda.set_engine(acq_engine)
-
-        monogram = MonogramCC(mmcore=mmc, publisher=Publisher(broker.pub_queue))
-        stages = iSIM_StageWidget(mmc, key_listener=KeyboardListener(mmc=mmc))
-        stages.show()
-    except FileNotFoundError:
-        from unittest.mock import MagicMock
-        acq_engine = MagicMock()
-        live_engine = MagicMock()
-        # Not on the iSIM
-        print("iSIM components could not be loaded.")
-        mmc.loadSystemConfiguration()
-        stage = StageWidget("XY", mmcore=mmc)
-        stage.show()
-
-
-    from isim_control.gui.preview import iSIMPreview
-    preview = iSIMPreview(mmcore=mmc, key_listener=KeyboardListener(mmc=mmc))
-    preview.show()
-
-    runner = iSIMRunner(mmc,
-                        live_engine=live_engine,
-                        acquisition_engine=acq_engine,
-                        devices=isim_devices,
-                        settings = settings,
-                        publisher=Publisher(broker.pub_queue))
-    broker.attach(runner)
-
-    default_settings = copy.deepcopy(settings)
-
-    #GUI
-    frame = MainWindow(Publisher(broker.pub_queue), settings, key_listener=KeyboardListener(mmc=mmc))
-    broker.attach(frame)
-    frame.update_from_settings(default_settings)
-
-    group_presets = GroupPresetTableWidget(mmcore=mmc)
-    frame.main.layout().addWidget(group_presets, 5, 0, 1, 3)
-    group_presets.show() # needed to keep events alive?
-    frame.show()
-
-    from isim_control.gui.output import OutputGUI
-    output = OutputGUI(mmc)
-    broker.attach(output)
-
-    from isim_control.gui.position_history import PositionHistory
-    history = PositionHistory(mmc, key_listener=KeyboardListener(mmc=mmc))
-    history.show()
-
-    app.exec_()
-    broker.stop()
-    save_settings(runner.settings)
-
-    if monogram:
-        monogram.stop()

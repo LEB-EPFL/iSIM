@@ -42,6 +42,7 @@ class OutputGUI(QObject):
 
     def make_viewer(self):
         if self.viewer:
+            self.save_button.close()
             del self.viewer
         sequence: MDASequence = useq_from_settings(self.settings)
         self.mm_config = self.mmc.getSystemState().dict()
