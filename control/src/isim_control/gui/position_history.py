@@ -1,7 +1,7 @@
 from pymmcore_plus import CMMCorePlus
 import operator, time
 import numpy as np
-
+import copy
 from qtpy import QtCore, QtGui, QtWidgets
 
 class Colors(object):
@@ -19,16 +19,18 @@ class PositionHistory(QtWidgets.QGraphicsView):
     xy_stage_position_python = QtCore.Signal(object)
     increase_values_signal = QtCore.Signal(object, object, object)
 
-    def __init__(self, mmcore: CMMCorePlus, parent:QtWidgets.QWidget=None):
+    def __init__(self, mmcore: CMMCorePlus, key_listener: QtCore.QObject | None = None,
+                 parent:QtWidgets.QWidget=None):
         super().__init__()
         self.mmc = mmcore
+        self.max_img = 0
 
         # Set the properties for the window so that everything is shown and we don't have Scrollbars
         self.view_size = (3000, 3000)
         self.setScene(QtWidgets.QGraphicsScene(self))
         self.setBaseSize(self.view_size[0], self.view_size[1])
         self.setSceneRect(0, 25, self.view_size[0], self.view_size[1] - 50)
-        self.scale(-1, -1)
+        self.scale(1, -1)
         self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
@@ -86,12 +88,16 @@ class PositionHistory(QtWidgets.QGraphicsView):
         self.mmc.events.liveFrameReady.connect(self.frame_ready)
         self.increase_values_signal.connect(self.increase_values)
 
+        if key_listener:
+            self.key_listener = key_listener
+            self.installEventFilter(self.key_listener)
+
 
     def frame_ready(self, frame, event, metadata):
         self.increase_values_signal.emit(frame, event, metadata)
 
     def stage_moved(self, name, new_pos0, new_pos1):
-        print("STAGE MOVED IN HISTORY", new_pos0, new_pos1)
+        # print("STAGE MOVED IN HISTORY", new_pos0, new_pos1)
         new_pos = [new_pos0, new_pos1]
         self.stage_pos = new_pos
         new_pos = [x/10 for x in new_pos]
@@ -100,47 +106,13 @@ class PositionHistory(QtWidgets.QGraphicsView):
         self.rect = QtCore.QRectF(pos[0], pos[1], self.fov_size[0], self.fov_size[1])
         self.my_pixmap.setPixmap(QtGui.QPixmap.fromImage(self.map))
         self.now_rect.setPos(QtCore.QPointF(pos[0], pos[1]))
-        self.set_oof_arrow()
         self.repaint()
-        self.xy_stage_position_python.emit(self.stage_pos)
+        # self.xy_stage_position_python.emit(self.stage_pos)
 
     def rectangle_pos(self, pos):
         rect_pos = [int(self.sample_size[0]*0.5 + pos[0] - self.fov_size[0]/2),
                     int(self.sample_size[1]*0.5 + pos[1] - self.fov_size[1]/2)]
         return rect_pos
-
-    def set_oof_arrow(self):
-        pos = self.rectangle_pos(list(map(operator.sub, self.stage_pos, self.stage_offset)))
-        y = self.check_limits(pos[1]+self.fov_size[1]/2)
-        x = self.check_limits(pos[0]+self.fov_size[0]/2)
-        self.arrow.setVisible(1)
-        offset = 25
-        if x == offset and y == offset:
-            self.arrow.setPos(QtCore.QPointF(offset, offset))
-            self.arrow.setRotation(-45)
-        elif x == offset and y == self.sample_size[0]-offset:
-            self.arrow.setPos(QtCore.QPointF(offset, self.sample_size[1]-offset))
-            self.arrow.setRotation(-135)
-        elif x == self.sample_size[0]-offset and y == self.sample_size[0]-offset:
-            self.arrow.setPos(QtCore.QPointF(self.sample_size[0]-offset, self.sample_size[1]-offset))
-            self.arrow.setRotation(135)
-        elif x == self.sample_size[0]-offset and y == offset:
-            self.arrow.setPos(QtCore.QPointF(self.sample_size[0]-offset, offset))
-            self.arrow.setRotation(45)
-        elif pos[0] - self.sample_size[0]/2 > self.sample_size[0]/2:
-            self.arrow.setPos(QtCore.QPointF(self.sample_size[0]-offset, y))
-            self.arrow.setRotation(90)
-        elif pos[0] - self.sample_size[0]/2  < -self.sample_size[0]/2:
-            self.arrow.setRotation(-90)
-            self.arrow.setPos(QtCore.QPointF(offset, y))
-        elif pos[1] - self.sample_size[1]/2 < -self.sample_size[1]/2:
-            self.arrow.setRotation(0)
-            self.arrow.setPos(QtCore.QPointF(x, offset))
-        elif pos[1] - self.sample_size[1]/2  > self.sample_size[1]/2:
-            self.arrow.setRotation(180)
-            self.arrow.setPos(QtCore.QPointF(x, self.sample_size[1]-offset))
-        else:
-            self.arrow.setVisible(0)
 
     def check_limits(self, pos):
         if pos < 0:
@@ -159,36 +131,53 @@ class PositionHistory(QtWidgets.QGraphicsView):
 
     def increase_values(self, img, event= None, metadata=None):
         self.painter = self.define_painter()
-        current_color = self.map.pixelColor(self.rect.center().toPoint()).getHsv()
+        current_img = self.map.copy(self.rect.toRect())
+        width, height = current_img.width(), current_img.height()
+        ptr = current_img.bits()
+        ptr.setsize(height*width*4)
+        arr = np.frombuffer(ptr, np.uint8).reshape((height, width, 4))
+        sum_arr = np.sum(arr, 2)
+        max_value_px = np.where(sum_arr == sum_arr.max())
+        current_color = arr[max_value_px[0], max_value_px[1]][0]
+        current_color = QtGui.QColor(current_color[2], current_color[1], current_color[0]).getHsv()
 
         #make the image smaller
         scale = int(np.ceil(img.shape[0]/self.fov_size[0]))
         img = img[::scale, ::scale]
-        img = np.require(img/img.max()*255, np.uint8, 'C')
+        if event == "led":
+            img = img.max() - img
+            paint_max = img.max()
+        else:
+            self.max_img = max(self.max_img, img.max())
+            paint_max = self.max_img
+            if paint_max > img.max()*3:
+                paint_max = img.max()*3
+
+            img = img - img.min()
+        img = np.require(img/paint_max*255, np.uint8, 'C')
+        img = np.flipud(np.rot90(img)).copy()
         width, height = img.shape
 
         t0 = time.perf_counter()
-        # Take the current color and cycle along the hue rom green to red over several frames
-        if abs(sum([x - y for x,y in zip(current_color, (0, 0, 0, 255))])) < 10:
-
-            my_color = [162, 30, 230/255, 15]
+        # Take the current color and cycle along the hue from green to red over several frames
+        if abs(sum(x-y for x,y in zip(current_color, (0, 0, 0, 255)))) < 10:
+            my_color = [162, 30, 1, 255]
         else:
-            slope = 10
+            slope = 8
             my_color = [max([0, current_color[0] - slope]),
-                      min([181, current_color[1] + slope*5]),
-                      230/255,
-                      max(25, int(255-current_color[0]*1.4))]
-
+                      min([255, current_color[1] + slope*5]),
+                      1, #230/255,
+                      min(255, max(80, int(255-current_color[0])))]
         color = QtGui.QColor(0, 0, 0, 255)
         self.painter.setBrush(QtGui.QBrush(color))
         self.painter.drawRect(self.rect)
-        # print(current_color)
-        # print(my_color)
+
         qimage = QtGui.QImage(img.data, width, height, height, QtGui.QImage.Format_Grayscale8)
         qimage = qimage.convertToFormat(QtGui.QImage.Format_Indexed8)
         color_table = [QtGui.QColor().fromHsv(my_color[0], my_color[1], int(i*my_color[2]),
                                               my_color[3]).rgba()
                               for i in range(256)]
+
         qimage.setColorTable(color_table)
         self.painter.drawImage(self.rect.topLeft(), qimage)
 
@@ -207,28 +196,6 @@ class PositionHistory(QtWidgets.QGraphicsView):
         return painter
 
     def keyPressEvent(self, event):
-        # print("KEY pressed: ", event.key())
-        # print(event.modifiers() & QtCore.Qt.ShiftModifier)
-        if event.modifiers() & QtCore.Qt.ShiftModifier:
-            move_modifier = 0.2 * self.size_adjust
-        else:
-            move_modifier = 1 * self.size_adjust
-        if event.key() == 16777236:
-            event.accept()
-            self.stage_pos[0] = self.stage_pos[0] - self.fov_size[0] * move_modifier
-            self.stage_moved('default', self.stage_pos[0], self.stage_pos[1])
-        if event.key() == 16777234:
-            event.accept()
-            self.stage_pos[0] = self.stage_pos[0] + self.fov_size[0] * move_modifier
-            self.stage_moved('default', self.stage_pos[0], self.stage_pos[1])
-        if event.key() == 16777235:
-            event.accept()
-            self.stage_pos[1] = self.stage_pos[1] + self.fov_size[1] * move_modifier
-            self.stage_moved('default', self.stage_pos[0], self.stage_pos[1])
-        if event.key() == 16777237:
-            event.accept()
-            self.stage_pos[1] = self.stage_pos[1] - self.fov_size[1] * move_modifier
-            self.stage_moved('default', self.stage_pos[0], self.stage_pos[1])
         if event.key() == 16777220:
             "Enter: Reset drawn positions"
             self.clear_history()
