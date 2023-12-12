@@ -138,7 +138,6 @@ class OMETiffWriter:
         return self._mmaps
 
     def __del__(self):
-        print("DELETING WRITER DATA")
         for mmap in self._mmaps:
             mmap.flush()
             del mmap
