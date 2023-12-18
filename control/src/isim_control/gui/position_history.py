@@ -203,7 +203,7 @@ class PositionHistory(QtWidgets.QGraphicsView):
             "NumPadEnter: reset position of rectangle"
             self.clear_history()
             self.stage_offset = copy.deepcopy(self.stage_pos)
-            self.stage_moved(self.stage_pos)
+            self.stage_moved("XY", self.stage_pos[0], self.stage_pos[1])
 
     def clear_history(self):
             self.map = QtGui.QImage(self.sample_size[0], self.sample_size[1],
