@@ -54,6 +54,7 @@ class iSIMPreview(QWidgetRestore):
     def new_frame(self, image, event, meta):
         if not self.isVisible():
             self.show()
+        self.raise_()
         self.current_frame = image
 
     def save_image(self):
