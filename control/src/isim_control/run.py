@@ -2,6 +2,7 @@ import copy
 from isim_control.gui.dark_theme import set_dark
 from qtpy.QtWidgets import QApplication
 from qtpy.QtCore import Signal
+from qtpy import QtGui
 
 from isim_control.settings_translate import save_settings, load_settings
 from isim_control.pubsub import Publisher, Broker
@@ -102,6 +103,8 @@ history = PositionHistory(mmc, key_listener=KeyboardListener(mmc=mmc))
 history.show()
 
 app.exec_()
+
+# Clean things up
 broker.stop()
 full_settings = frame.get_full_settings(runner.settings)
 save_settings(full_settings)

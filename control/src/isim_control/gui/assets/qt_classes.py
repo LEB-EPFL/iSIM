@@ -42,4 +42,4 @@ class QMainWindowRestore(QtWidgets.QMainWindow):
         # Close all other windows too
         app = QtWidgets.QApplication.instance()
         app.closeAllWindows()
-        e.accept()
+        super().closeEvent(e)

@@ -2,7 +2,7 @@ from __future__ import annotations
 from pymmcore_plus import CMMCorePlus
 from qtpy.QtWidgets import (QWidget, QGridLayout, QPushButton, QFileDialog, QMainWindow,
                             QVBoxLayout, QHBoxLayout, QCheckBox)
-from qtpy import QtCore
+from qtpy import QtCore, QtGui
 from superqt import fonticon, QRangeSlider
 from fonticon_mdi6 import MDI6
 from tifffile import imsave
@@ -46,11 +46,14 @@ class iSIMPreview(QWidgetRestore):
         self.layout().addWidget(self.save_btn, 1, 0)
         self.layout().addWidget(self.collapse_btn, 1, 4)
 
+        self.installEventFilter(self)
         if key_listener:
             self.key_listener = key_listener
             self.installEventFilter(self.key_listener)
 
     def new_frame(self, image, event, meta):
+        if not self.isVisible():
+            self.show()
         self.current_frame = image
 
     def save_image(self):
@@ -67,13 +70,15 @@ class iSIMPreview(QWidgetRestore):
         self.preview.view.camera.set_range(margin=0)
 
     def closeEvent(self, event):
-        settings = {"path": str(self.save_loc),
-                    "rot": self.rot,
-                    "mirror_x": self.mirror_x,
-                    "mirror_y": self.mirror_y}
-        save_settings(settings, "live_view")
-        super().closeEvent(event)
-
+        if event.spontaneous():
+            self.hide()
+            event.ignore()
+        else:
+            settings = {"path": str(self.save_loc),
+                        "rot": self.rot,
+                        "mirror_x": self.mirror_x,
+                        "mirror_y": self.mirror_y}
+            save_settings(settings, "live_view")
 
 
 class Canvas(QWidget):
