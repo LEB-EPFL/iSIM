@@ -9,6 +9,7 @@ from datetime import timedelta
 from typing import TYPE_CHECKING, Any, cast
 from pathlib import Path
 import yaml
+from isim_control.pubsub import Subscriber
 
 if TYPE_CHECKING:
     import numpy as np
@@ -27,6 +28,9 @@ class OMETiffWriter:
                 "Please `pip install tifffile`. and pyyaml"
             ) from e
 
+        routes = {"new_frame": [self.frameReady],}
+        self.sub = Subscriber(["acq"], routes)
+
         # create an empty OME-TIFF file
         self._folder = Path(folder)
         self._settings = settings
@@ -40,6 +44,7 @@ class OMETiffWriter:
         self._set_sequence(seq)
 
     def frameReady(self, frame: np.ndarray, event: useq.MDAEvent, meta: dict) -> None:
+        print("FRAME READY IN WRITER")
         if event is None:
             return
         if self._mmaps is None:

@@ -5,13 +5,23 @@ from useq import MDASequence
 
 from isim_control.settings import iSIMSettings
 from isim_control.settings_translate import useq_from_settings, load_settings
-from isim_control.pubsub import Subscriber
+from isim_control.pubsub import Subscriber, Publisher, Broker
 from isim_control.io.ome_tiff_writer import OMETiffWriter
 from isim_control.gui.save_button import SaveButton
 
 from qtpy.QtCore import QObject, Signal, QTimer
 import time
 
+import multiprocessing
+import numpy as np
+
+
+def make_writer(queue, path, settings, mm_config, sequence):
+    broker = Broker(pub_queue=queue)
+    writer = OMETiffWriter(path, settings, mm_config)
+    writer.sequenceStarted(sequence)
+    broker.attach(writer)
+    print("WRITER ACTIVE")
 
 class OutputGUI(QObject):
     acquisition_started = Signal()
@@ -55,9 +65,12 @@ class OutputGUI(QObject):
                     self.mmc.getImageWidth()]
         self.datastore = QLocalDataStore(shape, mmcore=self.mmc)
         if self.settings['save']:
-            self.writer = OMETiffWriter(self.settings['path'], self.settings, self.mm_config)
-            self.writer.sequenceStarted(sequence)
-            self.mmc.mda.events.frameReady.connect(self.writer.frameReady)
+            self.external_queue = multiprocessing.Queue()
+            self.ext_pub = Publisher(self.external_queue)
+
+            self.ext_p = multiprocessing.Process(target=make_writer, args=([self.external_queue, self.settings['path'], self.settings, self.mm_config, sequence]))
+            self.ext_p.start()
+
         # Delay the creation of the viewer so that the preview can finish
         self.size = (self.mmc.getImageHeight(), self.mmc.getImageWidth())
         delay = int(max(0, 1200 - (time.perf_counter() - self.last_live_stop)*1000))
@@ -71,6 +84,9 @@ class OutputGUI(QObject):
                                       self.mm_config)
         self.viewer.bottom_buttons.addWidget(self.save_button)
         self.viewer.show()
+        time.sleep(10)
+        from useq import MDAEvent
+        self.ext_pub.publish("acq", "new_frame", [np.ones((512, 512)), MDAEvent(index={'t': 0, 'z': 0, 'c': 0, 'g': 0}), {}])
 
     def _on_live_toggle(self, toggled):
         if not toggled:

@@ -4,10 +4,11 @@ from _queue import Empty
 from threading import Thread
 
 class Broker(Thread):
-    def __init__(self, auto_start: bool = True):
+    def __init__(self, pub_queue: multiprocessing.Queue | None = None,
+                 auto_start: bool = True):
         super().__init__()
         self.subscribers = set()
-        self.pub_queue = multiprocessing.Queue()
+        self.pub_queue = pub_queue or multiprocessing.Queue()
         self.stop_requested = False
         if auto_start:
             self.start()
