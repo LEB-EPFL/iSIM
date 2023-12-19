@@ -9,7 +9,7 @@ from tifffile import imsave
 from pathlib import Path
 import numpy as np
 from vispy import scene, visuals
-from pymmcore_widgets._mda._util._hist import HistPlot
+# from pymmcore_widgets._mda._util._hist import HistPlot
 
 from isim_control.settings_translate import load_settings, save_settings
 from isim_control.gui.assets.qt_classes import QWidgetRestore
@@ -116,8 +116,8 @@ class Canvas(QWidget):
         self.layout().setContentsMargins(0, 0, 0, 0)
         self.layout().addWidget(self._canvas.native)
 
-        self.histogram = HistPlot()
-        self.layout().addWidget(self.histogram)
+        # self.histogram = HistPlot()
+        # self.layout().addWidget(self.histogram)
 
         self.max_slider = 1
         self.clim_slider = QRangeSlider(QtCore.Qt.Horizontal)
@@ -147,7 +147,7 @@ class Canvas(QWidget):
     def _adjust_channel(self, channel: str) -> None:
         if channel == self.last_channel:
             return
-        self.histogram.set_max(self._clims.get(channel, (0, 2))[1])
+        # self.histogram.set_max(self._clims.get(channel, (0, 2))[1])
         block = self.clim_slider.blockSignals(True)
         self.clim_slider.setMaximum(self._clims.get(channel, (0, 2))[1])
         self.clim_slider.blockSignals(block)
@@ -191,7 +191,7 @@ class Canvas(QWidget):
             block = self.clim_slider.blockSignals(True)
             self.clim_slider.setRange(0, slider_max)
             self.clim_slider.blockSignals(block)
-            self.histogram.set_max(slider_max)
+            # self.histogram.set_max(slider_max)
 
-        self.histogram.update_data(img)
+        # self.histogram.update_data(img)
         self.last_channel = channel

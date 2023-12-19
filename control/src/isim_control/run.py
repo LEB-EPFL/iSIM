@@ -30,13 +30,13 @@ new_cls = type(
 mmc.events.__class__ = new_cls
 
 settings = load_settings()
-isim_devices = devices.NIDeviceGroup(settings=settings)
 
 
 from isim_control.io.keyboard import KeyboardListener
 # key_listener = KeyboardListener(mmc=mmc)
 
 try:
+    isim_devices = devices.NIDeviceGroup(settings=settings)
     from isim_control.io.monogram import MonogramCC
     mmc.loadSystemConfiguration("C:/iSIM/iSIM/mm-configs/pymmcore_plus.cfg")
     mmc.setCameraDevice("PrimeB_Camera")
@@ -62,6 +62,7 @@ except FileNotFoundError:
     from unittest.mock import MagicMock
     acq_engine = MagicMock()
     live_engine = MagicMock()
+    isim_devices = MagicMock()
     # Not on the iSIM
     print("iSIM components could not be loaded.")
     mmc.loadSystemConfiguration()
