@@ -2,12 +2,10 @@ import copy
 from isim_control.gui.dark_theme import set_dark
 from qtpy.QtWidgets import QApplication
 from qtpy.QtCore import Signal
-from qtpy import QtGui
 
 from isim_control.settings_translate import save_settings, load_settings
 from isim_control.pubsub import Publisher, Broker
 from isim_control.runner import iSIMRunner
-from isim_control.ni import live, acquisition, devices
 
 from isim_control.gui.main_window import iSIM_StageWidget, MainWindow
 from pymmcore_plus import CMMCorePlus
@@ -37,8 +35,6 @@ if __name__ == "__main__":
     # key_listener = KeyboardListener(mmc=mmc)
 
     try:
-        isim_devices = devices.NIDeviceGroup(settings=settings)
-        from isim_control.io.monogram import MonogramCC
         mmc.loadSystemConfiguration("C:/iSIM/iSIM/mm-configs/pymmcore_plus.cfg")
         mmc.setCameraDevice("PrimeB_Camera")
         mmc.setProperty("PrimeB_Camera", "TriggerMode", "Edge Trigger")
@@ -51,6 +47,9 @@ if __name__ == "__main__":
         mmc.setAutoShutter(False)
 
         #Backend
+        from isim_control.ni import live, acquisition, devices
+        isim_devices = devices.NIDeviceGroup(settings=settings)
+        from isim_control.io.monogram import MonogramCC
         acq_engine = acquisition.AcquisitionEngine(mmc, isim_devices, settings)
         live_engine = live.LiveEngine(task=acq_engine.task, mmcore=mmc, settings=settings,
                                         device_group=isim_devices)
@@ -99,8 +98,7 @@ if __name__ == "__main__":
     frame.show()
 
     from isim_control.gui.output import OutputGUI
-    output = OutputGUI(mmc)
-    broker.attach(output)
+    output = OutputGUI(mmc, settings, broker)
 
     from isim_control.gui.position_history import PositionHistory
     history = PositionHistory(mmc, key_listener=KeyboardListener(mmc=mmc))

@@ -9,6 +9,8 @@ from isim_control.pubsub import Subscriber, Publisher, Broker
 from isim_control.mp_pubsub import Relay
 from isim_control.io.ome_tiff_writer import OMETiffWriter
 from isim_control.gui.save_button import SaveButton
+from isim_control.io.buffered_datastore import BufferedDataStore
+from isim_control.io.remote_datastore import RemoteDatastore
 
 from qtpy.QtCore import QObject, Signal, QTimer
 from qtpy.QtWidgets import QWidget
@@ -18,33 +20,42 @@ import multiprocessing
 import numpy as np
 
 
-def writer_process(queue, settings, mm_config, out_conn):
+def writer_process(queue, settings, mm_config, out_conn, name):
     broker = Broker(pub_queue=queue)
     sequence = useq_from_settings(settings)
-    writer = OMETiffWriter(settings["path"], settings, mm_config)
+    print("MAKING REMOTE DATASTORE")
+    datastore = RemoteDatastore(name)
+    print("MAKING REMOTE WRITER", settings["path"])
+    writer = OMETiffWriter(settings["path"], datastore, settings, mm_config)
+    print("INITING REMOTE WRITER")
     writer.sequenceStarted(sequence)
     broker.attach(writer)
+    print("REMOTE PROCESS READY")
     out_conn.send(True)
+
 
 
 class OutputGUI(QWidget):
     acquisition_started = Signal()
-    def __init__(self, mmcore: CMMCorePlus):
+    def __init__(self, mmcore: CMMCorePlus, settings: iSIMSettings, broker: Broker):
         super().__init__()
         self.mmc = mmcore
+        self.broker = broker
 
         routes = {"acquisition_start": [self._on_acquisition_start],
                   "settings_change": [self._on_settings_change],
                   "live_button_clicked": [self._on_live_toggle],}
         self.sub = Subscriber(["gui"], routes)
-        self.settings = iSIMSettings()
+        self.broker.attach(self)
+
+        self.settings = settings
         self.acquisition_started.connect(self.make_viewer)
         view_settings = load_settings("live_view")
         self.transform = (view_settings.get("rot", 0),
                           view_settings.get("mirror_x", False),
                           view_settings.get("mirror_y", True))
-        self.last_live_stop = time.perf_counter()
 
+        self.last_live_stop = time.perf_counter()
         self.mm_config = None
         self.viewer = None
         self.relay = None
@@ -66,11 +77,14 @@ class OutputGUI(QWidget):
         self.datastore = QLocalDataStore(shape, mmcore=self.mmc)
         if self.settings['save']:
             self.relay = Relay(self.mmc)
+            self.buffered_datastore = BufferedDataStore(mmcore=self.mmc, create=True,
+                                                        publisher=self.relay.pub)
             self.ext_p = multiprocessing.Process(target=writer_process,
                                                  args=([self.relay.pub_queue,
                                                         self.settings,
                                                         self.mmc.getSystemState().dict(),
-                                                        self.relay.out_conn]))
+                                                        self.relay.out_conn,
+                                                        self.buffered_datastore._shm.name]))
             self.ext_p.start()
             self.relay.in_conn.recv()
 
@@ -83,9 +97,9 @@ class OutputGUI(QWidget):
         self.viewer = StackViewer(datastore=self.datastore, mmcore=self.mmc,
                                   sequence=useq_from_settings(self.settings),
                                   size=self.size, transform=self.transform)
-        self.save_button = SaveButton(self.datastore, self.viewer.sequence, self.settings,
-                                      self.mm_config)
-        self.viewer.bottom_buttons.addWidget(self.save_button)
+        # self.save_button = SaveButton(self.datastore, self.viewer.sequence, self.settings,
+        #                               self.mmc.getSystemState().dict())
+        # self.viewer.bottom_buttons.addWidget(self.save_button)
         self.viewer.show()
 
     def get_shape(self, settings:dict):
@@ -100,4 +114,5 @@ class OutputGUI(QWidget):
             self.last_live_stop = time.perf_counter()
 
     def close_processes(self):
-        self.relay.pub.publish("stop", "stop", [])
+        if self.relay:
+            self.relay.pub.publish("stop", "stop", [])

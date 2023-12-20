@@ -14,11 +14,13 @@ from useq import MDAEvent
 if TYPE_CHECKING:
     import numpy as np
     import useq
+    from isim_control.io.remote_datastore import RemoteDatastore
 
 
 class OMETiffWriter:
-    def __init__(self, folder: Path | str, settings:dict | None = None,
-                 mm_config: dict|None = None) -> None:
+    def __init__(self, folder: Path | str, datastore: RemoteDatastore,
+                 settings:dict | None = None,
+                 mm_config: dict|None = None, ) -> None:
         try:
             import tifffile  # noqa: F401
             import yaml
@@ -29,7 +31,8 @@ class OMETiffWriter:
             ) from e
 
         routes = {"new_frame": [self.frameReady],}
-        self.sub = Subscriber(["acq"], routes)
+        self.sub = Subscriber(["datastore"], routes)
+        self.datastore = datastore
 
         # create an empty OME-TIFF file
         self._folder = Path(folder)
@@ -43,7 +46,9 @@ class OMETiffWriter:
     def sequenceStarted(self, seq: useq.MDASequence) -> None:
         self._set_sequence(seq)
 
-    def frameReady(self, frame: np.ndarray, event: dict | MDAEvent | None, meta: dict) -> None:
+    def frameReady(self, event: dict | MDAEvent | None, shape, idx, meta) -> None:
+        print("RECEIVED FRAME INDEX", idx)
+        frame = self.datastore.get_frame(idx, shape[0], shape[1])
         if event is None:
             return
         elif isinstance(event, dict):
@@ -86,7 +91,7 @@ class OMETiffWriter:
         if self._mm_config:
             with open(self._folder/'mm_config.txt', 'w') as outfile:
                 yaml.dump(self._mm_config, outfile, default_flow_style=False)
-
+        print("WRITER READY")
 
     def _create_seq_memmap(
         self, frame: np.ndarray, seq: useq.MDASequence, meta: dict
