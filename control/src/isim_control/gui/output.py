@@ -61,27 +61,21 @@ class OutputGUI(QWidget):
         if self.viewer:
             self.save_button.close()
             del self.viewer
-        sequence: MDASequence = useq_from_settings(self.settings)
-        self.mm_config = self.mmc.getSystemState().dict()
-        sizes = sequence.sizes
-        shape = [sizes.get('t', 1),
-                    sizes.get('z', 1),
-                    sizes.get('c', 1),
-                    sizes.get('g', 1),
-                    self.mmc.getImageHeight(),
-                    self.mmc.getImageWidth()]
+
+        shape = self.get_shape(self.settings)
         self.datastore = QLocalDataStore(shape, mmcore=self.mmc)
         if self.settings['save']:
             self.relay = Relay(self.mmc)
-            self.ext_p = multiprocessing.Process(target=writer_process, args=([self.relay.pub_queue,
-                                                                               self.settings,
-                                                                               self.mm_config,
-                                                                               self.relay.out_conn]))
+            self.ext_p = multiprocessing.Process(target=writer_process,
+                                                 args=([self.relay.pub_queue,
+                                                        self.settings,
+                                                        self.mmc.getSystemState().dict(),
+                                                        self.relay.out_conn]))
             self.ext_p.start()
             self.relay.in_conn.recv()
 
-        # Delay the creation of the viewer so that the preview can finish
         self.size = (self.mmc.getImageHeight(), self.mmc.getImageWidth())
+        # Delay the creation of the viewer so that the preview can finish
         delay = int(max(0, 1200 - (time.perf_counter() - self.last_live_stop)*1000))
         self.timer = QTimer.singleShot(delay, self.create_viewer)
 
@@ -93,6 +87,13 @@ class OutputGUI(QWidget):
                                       self.mm_config)
         self.viewer.bottom_buttons.addWidget(self.save_button)
         self.viewer.show()
+
+    def get_shape(self, settings:dict):
+        sequence = useq_from_settings(settings)
+        sizes = sequence.sizes
+        shape = [sizes.get('t', 1), sizes.get('z', 1), sizes.get('c', 1), sizes.get('g', 1),
+                 self.mmc.getImageHeight(), self.mmc.getImageWidth()]
+        return shape
 
     def _on_live_toggle(self, toggled):
         if not toggled:
