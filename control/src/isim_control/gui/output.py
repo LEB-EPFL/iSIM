@@ -21,7 +21,7 @@ import numpy as np
 
 
 def writer_process(queue, settings, mm_config, out_conn, name):
-    broker = Broker(pub_queue=queue)
+    broker = Broker(pub_queue=queue, auto_start=False)
     sequence = useq_from_settings(settings)
     print("MAKING REMOTE DATASTORE")
     datastore = RemoteDatastore(name)
@@ -30,7 +30,7 @@ def writer_process(queue, settings, mm_config, out_conn, name):
     print("INITING REMOTE WRITER")
     writer.sequenceStarted(sequence)
     broker.attach(writer)
-    print("REMOTE PROCESS READY")
+    broker.start()
     out_conn.send(True)
 
 
@@ -72,13 +72,15 @@ class OutputGUI(QWidget):
         if self.viewer:
             self.save_button.close()
             del self.viewer
+        self.relay = Relay(self.mmc)
+        self.size = (self.mmc.getImageHeight(), self.mmc.getImageWidth())
+        # Delay the creation of the viewer so that the preview can finish
+        delay = int(max(0, 1200 - (time.perf_counter() - self.last_live_stop)*1000))
+        self.timer = QTimer.singleShot(delay, self.create_viewer)
 
         shape = self.get_shape(self.settings)
         self.datastore = QLocalDataStore(shape, mmcore=self.mmc)
         if self.settings['save']:
-            self.relay = Relay(self.mmc)
-            self.buffered_datastore = BufferedDataStore(mmcore=self.mmc, create=True,
-                                                        publisher=self.relay.pub)
             self.ext_p = multiprocessing.Process(target=writer_process,
                                                  args=([self.relay.pub_queue,
                                                         self.settings,
@@ -88,10 +90,6 @@ class OutputGUI(QWidget):
             self.ext_p.start()
             self.relay.in_conn.recv()
 
-        self.size = (self.mmc.getImageHeight(), self.mmc.getImageWidth())
-        # Delay the creation of the viewer so that the preview can finish
-        delay = int(max(0, 1200 - (time.perf_counter() - self.last_live_stop)*1000))
-        self.timer = QTimer.singleShot(delay, self.create_viewer)
 
     def create_viewer(self):
         self.viewer = StackViewer(datastore=self.datastore, mmcore=self.mmc,
