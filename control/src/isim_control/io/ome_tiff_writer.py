@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, cast
 from pathlib import Path
 import yaml
 from isim_control.pubsub import Subscriber
-
+from useq import MDAEvent
 if TYPE_CHECKING:
     import numpy as np
     import useq
@@ -43,10 +43,11 @@ class OMETiffWriter:
     def sequenceStarted(self, seq: useq.MDASequence) -> None:
         self._set_sequence(seq)
 
-    def frameReady(self, frame: np.ndarray, event: useq.MDAEvent, meta: dict) -> None:
-        print("FRAME READY IN WRITER")
+    def frameReady(self, frame: np.ndarray, event: dict | MDAEvent | None, meta: dict) -> None:
         if event is None:
             return
+        elif isinstance(event, dict):
+            event = MDAEvent(**event)
         if self._mmaps is None:
             if not self._current_sequence:
                 # just in case sequenceStarted wasn't called
@@ -66,6 +67,7 @@ class OMETiffWriter:
 
         mmap[index] = frame
         mmap.flush()
+        print("DATA WRITTEN TO DISK")
 
     # -------------------- private --------------------
 

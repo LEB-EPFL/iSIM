@@ -67,6 +67,8 @@ if __name__ == "__main__":
         # Not on the iSIM
         print("iSIM components could not be loaded.")
         mmc.loadSystemConfiguration()
+        mmc.setProperty("Camera", "OnCameraCCDXSize", 2048)
+        mmc.setProperty("Camera", "OnCameraCCDYSize", 2048)
         stage = StageWidget("XY", mmcore=mmc)
         stage.show()
 
@@ -110,6 +112,8 @@ if __name__ == "__main__":
     broker.stop()
     full_settings = frame.get_full_settings(runner.settings)
     save_settings(full_settings)
+    output.close_processes()
+
 
     if monogram:
         monogram.stop()

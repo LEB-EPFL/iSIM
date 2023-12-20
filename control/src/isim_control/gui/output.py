@@ -6,24 +6,28 @@ from useq import MDASequence
 from isim_control.settings import iSIMSettings
 from isim_control.settings_translate import useq_from_settings, load_settings
 from isim_control.pubsub import Subscriber, Publisher, Broker
+from isim_control.mp_pubsub import Relay
 from isim_control.io.ome_tiff_writer import OMETiffWriter
 from isim_control.gui.save_button import SaveButton
 
 from qtpy.QtCore import QObject, Signal, QTimer
+from qtpy.QtWidgets import QWidget
 import time
 
 import multiprocessing
 import numpy as np
 
 
-def make_writer(queue, path, settings, mm_config, sequence):
+def writer_process(queue, settings, mm_config, out_conn):
     broker = Broker(pub_queue=queue)
-    writer = OMETiffWriter(path, settings, mm_config)
+    sequence = useq_from_settings(settings)
+    writer = OMETiffWriter(settings["path"], settings, mm_config)
     writer.sequenceStarted(sequence)
     broker.attach(writer)
-    print("WRITER ACTIVE")
+    out_conn.send(True)
 
-class OutputGUI(QObject):
+
+class OutputGUI(QWidget):
     acquisition_started = Signal()
     def __init__(self, mmcore: CMMCorePlus):
         super().__init__()
@@ -43,6 +47,7 @@ class OutputGUI(QObject):
 
         self.mm_config = None
         self.viewer = None
+        self.relay = None
 
     def _on_settings_change(self, keys, value):
         self.settings.set_by_path(keys, value)
@@ -51,6 +56,8 @@ class OutputGUI(QObject):
         self.acquisition_started.emit()
 
     def make_viewer(self):
+        if self.relay:
+            self.relay.pub.publish("stop", "stop", [])
         if self.viewer:
             self.save_button.close()
             del self.viewer
@@ -65,11 +72,13 @@ class OutputGUI(QObject):
                     self.mmc.getImageWidth()]
         self.datastore = QLocalDataStore(shape, mmcore=self.mmc)
         if self.settings['save']:
-            self.external_queue = multiprocessing.Queue()
-            self.ext_pub = Publisher(self.external_queue)
-
-            self.ext_p = multiprocessing.Process(target=make_writer, args=([self.external_queue, self.settings['path'], self.settings, self.mm_config, sequence]))
+            self.relay = Relay(self.mmc)
+            self.ext_p = multiprocessing.Process(target=writer_process, args=([self.relay.pub_queue,
+                                                                               self.settings,
+                                                                               self.mm_config,
+                                                                               self.relay.out_conn]))
             self.ext_p.start()
+            self.relay.in_conn.recv()
 
         # Delay the creation of the viewer so that the preview can finish
         self.size = (self.mmc.getImageHeight(), self.mmc.getImageWidth())
@@ -84,10 +93,10 @@ class OutputGUI(QObject):
                                       self.mm_config)
         self.viewer.bottom_buttons.addWidget(self.save_button)
         self.viewer.show()
-        time.sleep(10)
-        from useq import MDAEvent
-        self.ext_pub.publish("acq", "new_frame", [np.ones((512, 512)), MDAEvent(index={'t': 0, 'z': 0, 'c': 0, 'g': 0}), {}])
 
     def _on_live_toggle(self, toggled):
         if not toggled:
             self.last_live_stop = time.perf_counter()
+
+    def close_processes(self):
+        self.relay.pub.publish("stop", "stop", [])
