@@ -62,7 +62,7 @@ class OutputGUI(QWidget):
         if self.viewer:
             self.save_button.close()
             del self.viewer
-        self.writer_relay = Relay(self.mmc)
+        self.relay = Relay(self.mmc)
         self.size = (self.mmc.getImageHeight(), self.mmc.getImageWidth())
         # Delay the creation of the viewer so that the preview can finish
         delay = int(max(0, 1200 - (time.perf_counter() - self.last_live_stop)*1000))
