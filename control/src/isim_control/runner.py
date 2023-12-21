@@ -76,7 +76,6 @@ class iSIMRunner:
         """Once a second restart live if property has changed"""
         #TODO: should this go into LiveEngine?
         if time.perf_counter() - self.last_restart < 1:
-            print(device, " changed!")
             self.mmc.waitForDevice(device)
             self.live_engine.restart()
         self.last_restart = time.perf_counter()
@@ -92,7 +91,6 @@ class iSIMRunner:
                 restart = True
             self.mmc.setExposure(self.settings['camera']['exposure']*1000)
             self.mmc.waitForDevice(self.mmc.getCameraDevice())
-            print("EXPOSURE SET", self.mmc.getExposure())
             self.devices.update_settings(self.settings)
             self.live_engine.update_settings(self.settings)
             if restart:

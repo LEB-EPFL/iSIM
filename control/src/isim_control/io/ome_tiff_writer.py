@@ -6,16 +6,17 @@ Should be replaced once this is merged.
 from __future__ import annotations
 
 from datetime import timedelta
+from threading import Timer
 from typing import TYPE_CHECKING, Any, cast
 from pathlib import Path
 import yaml
 from isim_control.pubsub import Subscriber
-from useq import MDAEvent
+from useq import MDAEvent, MDASequence
 if TYPE_CHECKING:
     import numpy as np
     import useq
     from isim_control.io.remote_datastore import RemoteDatastore
-
+from isim_control.settings_translate import useq_from_settings
 
 class OMETiffWriter:
     def __init__(self, folder: Path | str, datastore: RemoteDatastore,
@@ -30,7 +31,8 @@ class OMETiffWriter:
                 "Please `pip install tifffile`. and pyyaml"
             ) from e
 
-        routes = {"new_frame": [self.frameReady],}
+        routes = {"new_frame": [self.frameReady],
+                  "reset": [self.sequenceStarted],}
         self.sub = Subscriber(["datastore"], routes)
         self.datastore = datastore
 
@@ -42,18 +44,24 @@ class OMETiffWriter:
         self._mmaps: None | np.memmap = None
         self._current_sequence: None | useq.MDASequence = None
         self.n_grid_positions: int = 1
+        self.preparing = False
 
-    def sequenceStarted(self, seq: useq.MDASequence) -> None:
+    def sequenceStarted(self, settings: dict, size: tuple[int, int]) -> None:
+        print("RESET RECEIVED IN REMOTE WRITER")
+        seq = useq_from_settings(settings)
         self._set_sequence(seq)
 
     def frameReady(self, event: dict | MDAEvent | None, shape, idx, meta) -> None:
-        print("RECEIVED FRAME INDEX", idx)
+        if self.preparing:
+            Timer(0.5, self.frameReady, [event, shape, idx, meta]).start()
+            return
         frame = self.datastore.get_frame(idx, shape[0], shape[1])
         if event is None:
             return
         elif isinstance(event, dict):
             event = MDAEvent(**event)
         if self._mmaps is None:
+            self.preparing = True
             if not self._current_sequence:
                 # just in case sequenceStarted wasn't called
                 self._set_sequence(event.sequence)  # pragma: no cover
@@ -64,6 +72,7 @@ class OMETiffWriter:
                 )
 
             mmap = self._create_seq_memmap(frame, seq, meta)[event.index.get("g", 0)]
+            self.preparing = False
         else:
             mmap = self._mmaps[event.index.get("g", 0)]
 
@@ -72,7 +81,6 @@ class OMETiffWriter:
 
         mmap[index] = frame
         mmap.flush()
-        print("DATA WRITTEN TO DISK")
 
     # -------------------- private --------------------
 
@@ -91,7 +99,6 @@ class OMETiffWriter:
         if self._mm_config:
             with open(self._folder/'mm_config.txt', 'w') as outfile:
                 yaml.dump(self._mm_config, outfile, default_flow_style=False)
-        print("WRITER READY")
 
     def _create_seq_memmap(
         self, frame: np.ndarray, seq: useq.MDASequence, meta: dict
@@ -150,6 +157,7 @@ class OMETiffWriter:
         return self._mmaps
 
     def __del__(self):
-        for mmap in self._mmaps:
-            mmap.flush()
-            del mmap
+        if self._mmaps:
+            for mmap in self._mmaps:
+                mmap.flush()
+                del mmap

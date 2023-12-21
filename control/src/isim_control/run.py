@@ -100,9 +100,9 @@ if __name__ == "__main__":
     from isim_control.gui.output import OutputGUI
     output = OutputGUI(mmc, settings, broker)
 
-    from isim_control.gui.position_history import PositionHistory
-    history = PositionHistory(mmc, key_listener=KeyboardListener(mmc=mmc))
-    history.show()
+    # from isim_control.gui.position_history import PositionHistory
+    # history = PositionHistory(mmc, key_listener=KeyboardListener(mmc=mmc))
+    # history.show()
 
     app.exec_()
 
@@ -111,7 +111,7 @@ if __name__ == "__main__":
     full_settings = frame.get_full_settings(runner.settings)
     save_settings(full_settings)
     output.close_processes()
-
-
+    mmc.setXYPosition(0, 0)
+    print("All processes asked to close")
     if monogram:
         monogram.stop()

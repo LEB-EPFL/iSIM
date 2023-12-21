@@ -5,33 +5,23 @@ from useq import MDASequence
 
 from isim_control.settings import iSIMSettings
 from isim_control.settings_translate import useq_from_settings, load_settings
-from isim_control.pubsub import Subscriber, Publisher, Broker
-from isim_control.mp_pubsub import Relay
-from isim_control.io.ome_tiff_writer import OMETiffWriter
+from isim_control.pubsub import Subscriber, Broker
+from isim_control.mp_pubsub import Relay, writer_process, viewer_process
+
 from isim_control.gui.save_button import SaveButton
 from isim_control.io.buffered_datastore import BufferedDataStore
-from isim_control.io.remote_datastore import RemoteDatastore
 
-from qtpy.QtCore import QObject, Signal, QTimer
+
+from qtpy.QtCore import Signal, QTimer
 from qtpy.QtWidgets import QWidget
 import time
 
 import multiprocessing
 import numpy as np
+from _queue import Empty
 
 
-def writer_process(queue, settings, mm_config, out_conn, name):
-    broker = Broker(pub_queue=queue, auto_start=False)
-    sequence = useq_from_settings(settings)
-    print("MAKING REMOTE DATASTORE")
-    datastore = RemoteDatastore(name)
-    print("MAKING REMOTE WRITER", settings["path"])
-    writer = OMETiffWriter(settings["path"], datastore, settings, mm_config)
-    print("INITING REMOTE WRITER")
-    writer.sequenceStarted(sequence)
-    broker.attach(writer)
-    broker.start()
-    out_conn.send(True)
+
 
 
 
@@ -43,62 +33,46 @@ class OutputGUI(QWidget):
         self.broker = broker
 
         routes = {"acquisition_start": [self._on_acquisition_start],
-                  "settings_change": [self._on_settings_change],
+                  #"settings_change": [self._on_settings_change],
                   "live_button_clicked": [self._on_live_toggle],}
         self.sub = Subscriber(["gui"], routes)
         self.broker.attach(self)
 
+        self.writer_relay = Relay()
+        self.viewer_relay = Relay()
+        self.buffered_datastore = BufferedDataStore(mmcore=self.mmc, create=True,
+                                                    publishers=[self.writer_relay.pub,
+                                                                self.viewer_relay.pub])
+
         self.settings = settings
         self.acquisition_started.connect(self.make_viewer)
-        view_settings = load_settings("live_view")
-        self.transform = (view_settings.get("rot", 0),
-                          view_settings.get("mirror_x", False),
-                          view_settings.get("mirror_y", True))
+
+        self.writer_process = multiprocessing.Process(target=writer_process,
+                                                 args=([self.writer_relay.pub_queue,
+                                                        self.settings,
+                                                        self.mmc.getSystemState().dict(),
+                                                        self.writer_relay.out_conn,
+                                                        self.buffered_datastore._shm.name]))
+        self.writer_process.start()
+
+        self.viewer_process = multiprocessing.Process(target=viewer_process,
+                                                 args=([self.viewer_relay.pub_queue,
+                                                        self.buffered_datastore._shm.name]))
+        self.viewer_process.start()
 
         self.last_live_stop = time.perf_counter()
         self.mm_config = None
         self.viewer = None
-        self.relay = None
-
-    def _on_settings_change(self, keys, value):
-        self.settings.set_by_path(keys, value)
 
     def _on_acquisition_start(self, toggled):
         self.acquisition_started.emit()
 
-    def make_viewer(self):
-        if self.relay:
-            self.relay.pub.publish("stop", "stop", [])
-        if self.viewer:
-            self.save_button.close()
-            del self.viewer
-        self.relay = Relay(self.mmc)
+    def make_viewer(self, settings:dict = None):
+        print("SENDING RESET TO PROCESSES")
         self.size = (self.mmc.getImageHeight(), self.mmc.getImageWidth())
-        # Delay the creation of the viewer so that the preview can finish
-        delay = int(max(0, 1200 - (time.perf_counter() - self.last_live_stop)*1000))
-        self.timer = QTimer.singleShot(delay, self.create_viewer)
-
-        shape = self.get_shape(self.settings)
-        self.datastore = QLocalDataStore(shape, mmcore=self.mmc)
+        self.viewer_relay.pub.publish("datastore", "reset", [self.settings, self.size])
         if self.settings['save']:
-            self.ext_p = multiprocessing.Process(target=writer_process,
-                                                 args=([self.relay.pub_queue,
-                                                        self.settings,
-                                                        self.mmc.getSystemState().dict(),
-                                                        self.relay.out_conn,
-                                                        self.buffered_datastore._shm.name]))
-            self.ext_p.start()
-            self.relay.in_conn.recv()
-
-
-    def create_viewer(self):
-        self.viewer = StackViewer(datastore=self.datastore, mmcore=self.mmc,
-                                  sequence=useq_from_settings(self.settings),
-                                  size=self.size, transform=self.transform)
-        # self.save_button = SaveButton(self.datastore, self.viewer.sequence, self.settings,
-        #                               self.mmc.getSystemState().dict())
-        # self.viewer.bottom_buttons.addWidget(self.save_button)
-        self.viewer.show()
+            self.writer_relay.pub.publish("datastore", "reset", [self.settings, self.size])
 
     def get_shape(self, settings:dict):
         sequence = useq_from_settings(settings)
@@ -112,5 +86,5 @@ class OutputGUI(QWidget):
             self.last_live_stop = time.perf_counter()
 
     def close_processes(self):
-        if self.relay:
-            self.relay.pub.publish("stop", "stop", [])
+        self.writer_relay.pub.publish("stop", "stop", [])
+        self.viewer_relay.pub.publish("stop", "stop", [])
