@@ -108,6 +108,6 @@ app.exec_()
 broker.stop()
 full_settings = frame.get_full_settings(runner.settings)
 save_settings(full_settings)
-
+mmc.setXYPosition(0, 0)
 if monogram:
     monogram.stop()
