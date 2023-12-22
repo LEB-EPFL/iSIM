@@ -1,6 +1,5 @@
 
 from .buffered_datastore import BufferedDataStore
-from useq import MDAEvent
 import numpy as np
 
 class RemoteDatastore():

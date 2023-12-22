@@ -19,8 +19,9 @@ class Broker(Thread):
     def route(self, topic, message: str, values: list):
         for subscriber in self.subscribers:
             if topic in subscriber.sub.topics:
-                subscriber.sub.sub_queue.put({"event": message,
-                                              "values": values})
+                if message in subscriber.sub.routes.keys():
+                    subscriber.sub.sub_queue.put({"event": message,
+                                                "values": values})
         if topic == "stop":
             self.stop()
 

@@ -6,7 +6,7 @@ from useq import MDASequence
 from isim_control.settings import iSIMSettings
 from isim_control.settings_translate import useq_from_settings, load_settings
 from isim_control.pubsub import Subscriber, Broker
-from isim_control.mp_pubsub import Relay, writer_process, viewer_process
+from isim_control.mp_pubsub import Relay, tiff_writer_process, viewer_process
 
 from isim_control.gui.save_button import SaveButton
 from isim_control.io.buffered_datastore import BufferedDataStore
@@ -19,10 +19,6 @@ import time
 import multiprocessing
 import numpy as np
 from _queue import Empty
-
-
-
-
 
 
 class OutputGUI(QWidget):
@@ -47,7 +43,7 @@ class OutputGUI(QWidget):
         self.settings = settings
         self.acquisition_started.connect(self.make_viewer)
 
-        self.writer_process = multiprocessing.Process(target=writer_process,
+        self.writer_process = multiprocessing.Process(target=tiff_writer_process,
                                                  args=([self.writer_relay.pub_queue,
                                                         self.settings,
                                                         self.mmc.getSystemState().dict(),
