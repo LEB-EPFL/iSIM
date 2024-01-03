@@ -29,8 +29,10 @@ class Broker(Thread):
         while True:
             try:
                 message = self.pub_queue.get(timeout=0.5)
+                print(message['topic'], message['event'])
                 self.route(message["topic"], message["event"], message["values"])
             except Empty:
+                print(self.stop_requested)
                 if self.stop_requested:
                     break
                 else:
