@@ -120,7 +120,7 @@ class RemoteViewer(StackViewer):
         return super().frameReady(MDAEvent(**event))
 
 
-def viewer_only_process(viewer_queue, out_pipe, name=None):
+def viewer_process(viewer_queue, out_pipe, name=None):
     app = QApplication([])
 
     set_dark(app)
@@ -165,7 +165,7 @@ if __name__ == "__main__":
     mmc.setProperty("Camera", "OnCameraCCDXSize", size)
     mmc.setProperty("Camera", "OnCameraCCDYSize", size)
 
-    settings = iSIMSettings(time_plan={"interval": 0, "loops": 200}, channels=
+    settings = iSIMSettings(time_plan={"interval": 0.25, "loops": 200}, channels=
                             ({"config": "DAPI", "exposure": 100},{"config": "FITC"}))
     settings["path"] = "C:/Users/stepp/Desktop/test.zarr"
 
