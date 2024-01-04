@@ -53,29 +53,26 @@ class RemoteZarrWriter(OMEZarrWriter):
     datatypes. This translates them to the needed types and sends out events.
     """
     frame_ready = Signal(MDAEvent)
-    def __init__(self, datastore: RemoteDatastore, pub_queue, *args, **kwargs):
+    def __init__(self, datastore: RemoteDatastore, pub_queue=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.sub = Subscriber(["datastore", "sequence"], {"new_frame": [self.frameReady],
                                               "sequence_started": [self.sequence_started],
                                               "sequence_finished": [self.sequence_finished]})
         self.datastore = datastore
-        self.pub = Publisher(pub_queue)
+        self.pub = Publisher(pub_queue) or None
 
     def frameReady(self, event: dict, shape: tuple[int, int], idx: int, meta: dict) -> None:
         img = self.datastore.get_frame(idx, shape[0], shape[1])
-        print("GOT FRAME, Writing")
         super().frameReady(img, MDAEvent(**event), meta)
-        print("SENDING FRAME READY")
-        self.pub.publish("writer", "frame_ready", [event, img.shape, idx, meta])
         self.frame_ready.emit(MDAEvent(**event))
+        if self.pub:
+            self.pub.publish("writer", "frame_ready", [event, img.shape, idx, meta])
 
     def sequence_started(self, seq: MDASequence) -> None:
         self._used_axes = tuple(seq.used_axes)
-        self.pub.publish("writer", "sequence_started", [seq]) # Make sure viewer also get's the event
         super().sequenceStarted(seq)
 
     def sequence_finished(self, seq: MDASequence) -> None:
-        self.pub.publish("writer", "sequence_finished", [seq])
         super().sequenceFinished(seq)
 
     def get_frame(self, event: MDAEvent) -> np.ndarray:
@@ -85,35 +82,31 @@ class RemoteZarrWriter(OMEZarrWriter):
         data: np.ndarray = ary[index]
         return data
 
-def zarr_writer_process(queue, settings, mm_config, out_conn, name,
-                        make_viewer=False):
+def zarr_writer_process(queue, settings, mm_config, out_conn, name, viewer_queue=None):
     broker = Broker(pub_queue=queue, auto_start=False)
     datastore = RemoteDatastore(name)
-    writer = RemoteZarrWriter(datastore, queue, store=settings["path"], overwrite=True)
+    writer = RemoteZarrWriter(datastore, viewer_queue, store=settings["path"], overwrite=True)
     broker.attach(writer)
-    if make_viewer:
-        view_process = multiprocessing.Process(target=viewer_only_process,
-                                            args=([queue,
-                                                   out_conn,
-                                                   settings['path']]))
-    view_process.start()
     out_conn.send(True)
     broker.start()
 
 
 class RemoteZarrStorage:
-
     frame_ready = Signal(MDAEvent)
     def __init__(self, path):
         self.store = zarr.open(path, mode='r')
-        self.sub = Subscriber(["writer"], {"frame_ready": [self.frameReady]})
+        self.sub = Subscriber(["writer", "sequence"], {"frame_ready": [self.frameReady],
+                                                       "sequence_started": [self.sequenceStarted],})
 
     def frameReady(self, event: dict, shape: tuple[int, int], idx: int, meta: dict) -> None:
         self.frame_ready.emit(MDAEvent(**event))
 
+    def sequenceStarted(self, seq: MDASequence) -> None:
+        self._used_axes = tuple(seq.used_axes)
+
     def get_frame(self, event):
-        index = tuple(event.index.get(k) for k in event.index.keys())
-        data = self.store['p0'][index[:-2]]
+        index = tuple(event.index.get(k) for k in self._used_axes)
+        data = self.store['p0'][index]
         return data
 
 
@@ -133,8 +126,10 @@ def viewer_only_process(viewer_queue, out_pipe, name=None):
     set_dark(app)
     broker = Broker(pub_queue=viewer_queue, auto_start=False)
     if os.path.isfile(name) or os.path.isdir(name):
+        # There is a zarr writer writing to a file, viewer will get data from there
         datastore = RemoteZarrStorage(name)
     else:
+        # name is the name of a shared memory buffer, viewer will get data from there
         remote_datastore = RemoteDatastore(name)
         datastore = RemoteZarrWriter(remote_datastore, viewer_queue, store=None, overwrite=True)
 
@@ -166,15 +161,16 @@ if __name__ == "__main__":
 
     mmc = CMMCorePlus()
     mmc.loadSystemConfiguration()
-    mmc.setProperty("Camera", "OnCameraCCDXSize", 2048)
-    mmc.setProperty("Camera", "OnCameraCCDYSize", 2048)
+    size = 2048
+    mmc.setProperty("Camera", "OnCameraCCDXSize", size)
+    mmc.setProperty("Camera", "OnCameraCCDYSize", size)
 
-    settings = iSIMSettings(time_plan={"interval": 0.2, "loops": 20}, channels=
+    settings = iSIMSettings(time_plan={"interval": 0, "loops": 200}, channels=
                             ({"config": "DAPI", "exposure": 100},{"config": "FITC"}))
     settings["path"] = "C:/Users/stepp/Desktop/test.zarr"
 
 
-    # Only viewer with own remote Datastore in same process
+    ## Only viewer with own remote Datastore in same process
     # viewer_relay = Relay(mmc)
     # buffered_datastore = BufferedDataStore(mmcore=mmc, create=True,
     #                                        publishers= [viewer_relay.pub])#[writer_relay.pub, viewer_relay.pub])
@@ -187,24 +183,69 @@ if __name__ == "__main__":
 
     # mmc.mda.run(useq_from_settings(settings))
     # viewer_relay.pub.publish("stop", "stop", [])
-    print("STOP SIGNAL SENT")
+    # print("STOP SIGNAL SENT")
 
-    time.sleep(1)
+    # time.sleep(1)
 
-    # Viewer and Zarr Writer in different processes, viewer launched from writer process
+    ## Viewer and Zarr Writer in different processes, viewer using writer location for data
+    # writer_relay = Relay(mmc)
+    # viewer_relay = Relay(mmc)
+    # buffered_datastore = BufferedDataStore(mmcore=mmc, create=True,
+    #                                        publishers= [writer_relay.pub])
+    # writer_process = multiprocessing.Process(target=zarr_writer_process,
+    #                                         args=([writer_relay.pub_queue,
+    #                                             settings,
+    #                                             mmc.getSystemState().dict(),
+    #                                             writer_relay.out_conn,
+    #                                             buffered_datastore._shm.name]),
+    #                                         kwargs=
+    #                                             {"viewer_queue": viewer_relay.pub_queue})
+
+    # viewer_process = multiprocessing.Process(target=viewer_only_process,
+    #                                     args=([viewer_relay.pub_queue,
+    #                                            viewer_relay.out_conn,
+    #                                            settings['path']]))
+
+    # writer_process.start()
+    # writer_relay.in_conn.recv()
+    # viewer_process.start()
+    # viewer_relay.in_conn.recv()
+
+    # mmc.mda.run(useq_from_settings(settings))
+    # time.sleep(2)
+    # while mmc.isSequenceRunning():
+    #     time.sleep(1)
+    # print("Sending stop")
+    # writer_relay.pub.publish("stop", "stop", [])
+    # viewer_relay.pub.publish("stop", "stop", [])
+
+    ## Viewer without writer and additional process for a tiff writer
     writer_relay = Relay(mmc)
-    buffered_datastore = BufferedDataStore(mmcore=mmc, create=True,
-                                           publishers= [writer_relay.pub])
-    writer_process = multiprocessing.Process(target=zarr_writer_process,
+    viewer_relay = Relay(mmc)
+    settings["path"] = "C:/Users/stepp/Desktop/test"
+    buffered_datastore = BufferedDataStore(mmcore=mmc, create=True, publishers=[writer_relay.pub,
+                                                                                viewer_relay.pub])
+    writer_process = multiprocessing.Process(target=tiff_writer_process,
                                             args=([writer_relay.pub_queue,
                                                 settings,
                                                 mmc.getSystemState().dict(),
                                                 writer_relay.out_conn,
-                                                buffered_datastore._shm.name,
-                                                {"make_viewer": True}]))
+                                                buffered_datastore._shm.name]))
+    viewer_process = multiprocessing.Process(target=viewer_only_process,
+                                            args=([viewer_relay.pub_queue,
+                                                   viewer_relay.out_conn,
+                                                   buffered_datastore._shm.name]))
+
     writer_process.start()
+    viewer_process.start()
+    viewer_relay.in_conn.recv()
     writer_relay.in_conn.recv()
 
-    time.sleep(5)
-    mmc.run_mda(useq_from_settings(settings))
+
+    mmc.mda.run(useq_from_settings(settings))
+    time.sleep(2)
+    while mmc.isSequenceRunning():
+        time.sleep(1)
+    print("Sending stop")
     writer_relay.pub.publish("stop", "stop", [])
+    viewer_relay.pub.publish("stop", "stop", [])

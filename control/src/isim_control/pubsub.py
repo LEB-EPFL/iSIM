@@ -32,7 +32,6 @@ class Broker(Thread):
                 print(message['topic'], message['event'])
                 self.route(message["topic"], message["event"], message["values"])
             except Empty:
-                print(self.stop_requested)
                 if self.stop_requested:
                     break
                 else:
