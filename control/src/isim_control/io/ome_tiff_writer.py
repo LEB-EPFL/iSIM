@@ -15,13 +15,14 @@ from useq import MDAEvent, MDASequence
 if TYPE_CHECKING:
     import numpy as np
     import useq
-    from isim_control.io.remote_datastore import RemoteDatastore
+    from isim_control.io.remote_datastore import RemoteDatastorese
 from isim_control.settings_translate import useq_from_settings
 
 class OMETiffWriter:
     def __init__(self, folder: Path | str, datastore: RemoteDatastore,
                  settings:dict | None = None,
-                 mm_config: dict|None = None, ) -> None:
+                 mm_config: dict|None = None,
+                 subscriber: bool = True) -> None:
         try:
             import tifffile  # noqa: F401
             import yaml
@@ -31,9 +32,9 @@ class OMETiffWriter:
                 "Please `pip install tifffile`. and pyyaml"
             ) from e
 
-        routes = {"new_frame": [self.frameReady],
-                  "reset": [self.sequenceStarted],}
-        self.sub = Subscriber(["datastore"], routes)
+        if subscriber:
+            routes = {"new_frame": [self.frameReady]}
+            self.sub = Subscriber(["datastore"], routes)
         self.datastore = datastore
 
         # create an empty OME-TIFF file
@@ -45,11 +46,6 @@ class OMETiffWriter:
         self._current_sequence: None | useq.MDASequence = None
         self.n_grid_positions: int = 1
         self.preparing = False
-
-    def sequenceStarted(self, settings: dict, size: tuple[int, int]) -> None:
-        print("RESET RECEIVED IN REMOTE WRITER")
-        seq = useq_from_settings(settings)
-        self._set_sequence(seq)
 
     def frameReady(self, event: dict | MDAEvent | None, shape, idx, meta) -> None:
         if self.preparing:
@@ -78,6 +74,7 @@ class OMETiffWriter:
 
         # WRITE DATA TO DISK
         index = tuple(event.index.get(k) for k in self._used_axes)
+        print("FRAME WRITTEN", event.index)
 
         mmap[index] = frame
         mmap.flush()
