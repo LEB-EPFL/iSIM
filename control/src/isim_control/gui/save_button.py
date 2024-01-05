@@ -1,56 +1,56 @@
 from pathlib import Path
-import numpy as np
+import warnings
 
-from qtpy.QtWidgets import QPushButton, QWidget, QFileDialog
+from qtpy.QtWidgets import  QWidget, QFileDialog
+
+
 from qtpy.QtGui import QCloseEvent
-from qtpy.QtCore import QSize
-from fonticon_mdi6 import MDI6
-from superqt import QLabeledSlider, fonticon
-from useq import MDAEvent, MDASequence
-from pymmcore_widgets._mda._datastore import QLocalDataStore
+from pymmcore_plus import CMMCorePlus
+from useq import  MDASequence
+
 
 from isim_control.io.ome_tiff_writer import OMETiffWriter
-from isim_control.settings_translate import load_settings, save_settings
+from pymmcore_widgets._mda._datastore import QOMEZarrDatastore
+from pymmcore_widgets._mda._util._save_button import SaveButton
 
-
-class SaveButton(QPushButton):
+class SaveButton(SaveButton):
     def __init__(self,
-                 datastore:QLocalDataStore,
-                 seq: MDASequence|None = None,
-                 settings: dict | None = None,
-                 mm_config: str | None = None,
+                 datastore:QOMEZarrDatastore,
+                 mmcore: CMMCorePlus,
+                 #TODO: add option to pass settings and mm_config
                  parent: QWidget | None = None):
+        super().__init__(datastore, parent=parent)
 
-        super().__init__(parent=parent)
-        # self.setFont(QFont('Arial', 50))
-        self.setMinimumHeight(40)
-        self.setIcon(fonticon.icon(MDI6.content_save_outline, color="gray"))
-        self.setIconSize(QSize(30, 30))
-        self.setFixedSize(40, 40)
-        self.clicked.connect(self.on_click)
-        settings = load_settings("stack_view")
-        self.save_loc = settings.get("path", Path.home())
-        self.datastore = datastore
-        self.seq = seq
-        self.settings = settings
-        self.mm_config = mm_config
+        self.save_loc = Path.home()
+        self.current_sequence: None | MDASequence = None
 
-    def on_click(self):
-        self.save_loc, _ = QFileDialog.getSaveFileName(directory=self.save_loc)
-        saver = OMETiffWriter(self.save_loc, self.settings, self.mm_config)
-        shape = self.datastore.array.shape
-        indeces = np.stack(np.meshgrid(range(shape[0]),
-                                       range(shape[1]),
-                                       range(shape[2]),
-                                       range(shape[3])), -1).reshape(-1, 4)
-        for index in indeces:
-            event_index = {'t': index[0], 'z': index[1], 'c': index[2], 'g': index[3]}
-            #TODO: we should also save the event info in the datastore and the metadata.
-            saver.frameReady(self.datastore.array[*index], MDAEvent(index=event_index, sequence=self.seq), {})
+        if mmcore:
+            self._mmc = mmcore
+            self._mmc.mda.events.sequenceStarted.connect(self.sequenceStarted)
+
+    def sequenceStarted(self, sequence: MDASequence) -> None:
+        self.current_sequence = sequence
+        self._used_axes = tuple(sequence.used_axes)
+
+    def _on_click(self) -> None:
+        self.save_loc, _ = QFileDialog.getSaveFileName(directory=str(self.save_loc))
+        if Path(self.save_loc).suffix == ".zarr":
+            super()._save_as_zarr(self.save_loc)
+        elif Path(self.save_loc).suffix == ".tiff":
+            extensions = "".join(Path(self.save_loc).suffixes)
+
+            saver = OMETiffWriter(str(self.save_loc).removesuffix(extensions),
+                                  self.datastore,
+                                  #TODO: don't call _mmc here if mm_condfig was passed in
+                                  mm_config=self._mmc.getSystemState().dict())
+            for event in self.current_sequence.iter_events():
+                #TODO: we should also save the event info in the datastore and the metadata.
+                saver.frameReady(event)
+        else:
+            warnings.warn(f"Unknown file extension {Path(self.save_loc).suffix}")
+
 
     def closeEvent(self, a0: QCloseEvent | None) -> None:
-        settings = {"path": str(self.save_loc)}
-        save_settings(settings, "stack_view")
         return super().closeEvent(a0)
 
 
@@ -58,22 +58,20 @@ if __name__ == "__main__":
     from qtpy.QtWidgets import QApplication
     from pymmcore_plus import CMMCorePlus
     from useq import MDASequence
+    from pymmcore_widgets._mda._datastore import QOMEZarrDatastore
     mmc = CMMCorePlus()
     mmc.loadSystemConfiguration()
 
     app = QApplication([])
-
     seq = MDASequence(time_plan={"interval":0.01, "loops": 10},
                       z_plan={"range": 3, "step": 1},
                       channels=[{"config": "DAPI", "exposure": 1},
                                 {"config": "FITC", "exposure": 1}])
-    shape = [seq.sizes.get('t', 1),
-             seq.sizes.get('z', 1),
-             seq.sizes.get('c', 1),
-             mmc.getImageHeight(),
-             mmc.getImageWidth()]
-    datastore = QLocalDataStore(shape, mmcore=mmc)
+    datastore = QOMEZarrDatastore()
+    mmc.mda.events.sequenceStarted.connect(datastore.sequenceStarted)
+    mmc.mda.events.frameReady.connect(datastore.frameReady)
+
+    widget = SaveButton(datastore, mmc)
     mmc.run_mda(seq)
-    widget = SaveButton(datastore, seq)
     widget.show()
     app.exec_()
