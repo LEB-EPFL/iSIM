@@ -4,8 +4,10 @@ import zarr
 import numpy as np
 import time
 import os
+from pathlib import Path
 
 from qtpy.QtWidgets import QApplication
+from qtpy import QtCore
 
 from isim_control.gui.dark_theme import set_dark
 from isim_control.settings_translate import useq_from_settings, load_settings
@@ -40,21 +42,45 @@ class Relay(Thread):
         self.pub.publish("sequence", "sequence_finished", [seq])
 
 
-def tiff_writer_process(queue, settings, mm_config, out_conn, name):
-    broker = Broker(pub_queue=queue, auto_start=False)
+
+class RemoteOMETiffWriter(OMETiffWriter):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, subscriber=False, **kwargs)
+        self.sub = Subscriber(["datastore"], {"reset": [self.reset],
+                                              "new_frame": [self.frameReady],})
+
+    def reset(self, settings, mm_config):
+        print("Resetting writer", settings["path"])
+        self._folder = Path(settings["path"])
+        self._settings = settings
+        self._mm_config = mm_config
+        self._set_sequence(useq_from_settings(settings))
+
+
+def tiff_writer_process(queue, settings, mm_config, in_conn, name):
     datastore = RemoteDatastore(name)
-    writer = OMETiffWriter(settings["path"], datastore, settings, mm_config)
-    broker.attach(writer)
-    out_conn.send(True)
-    broker.start()
+    writer = RemoteOMETiffWriter(settings["path"], datastore, settings, mm_config)
+    print("Writer ready")
+    event = in_conn.recv()
+    if event:
+        broker = Broker(pub_queue=queue, auto_start=False)
+        broker.attach(writer)
+        broker.start()
+    else:
+        del datastore
+        writer.sub.stop()
+        del writer
+        print("Writer process closing")
+
 
 class RemoteZarrWriter(OMEZarrWriter):
     """OMEZarrWriter that runs in a separate process. Communication therefore has to be in basic
     datatypes. This translates them to the needed types and sends out events.
     """
     frame_ready = Signal(MDAEvent)
-    def __init__(self, datastore: RemoteDatastore, pub_queue=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, datastore: RemoteDatastore, pub_queue=None,
+                 zarr_version=3, *args, **kwargs):
+        super().__init__(*args, zarr_version=zarr_version, **kwargs)
         self.sub = Subscriber(["datastore", "sequence"], {"new_frame": [self.frameReady],
                                               "sequence_started": [self.sequence_started],
                                               "sequence_finished": [self.sequence_finished]})
@@ -62,9 +88,10 @@ class RemoteZarrWriter(OMEZarrWriter):
         self.pub = Publisher(pub_queue) or None
 
     def frameReady(self, event: dict, shape: tuple[int, int], idx: int, meta: dict) -> None:
+        t0 = time.perf_counter()
         img = self.datastore.get_frame(idx, shape[0], shape[1])
         super().frameReady(img, MDAEvent(**event), meta)
-        self.frame_ready.emit(MDAEvent(**event))
+        # self.frame_ready.emit(MDAEvent(**event))
         if self.pub:
             self.pub.publish("writer", "frame_ready", [event, img.shape, idx, meta])
 
@@ -113,43 +140,63 @@ class RemoteZarrStorage:
 class RemoteViewer(StackViewer):
     def __init__(self, size, transform, datastore):
         super().__init__(size=size, transform=transform, datastore=datastore)
-        self.sub = Subscriber(["writer", "sequence"], {"frame_ready": [self.on_frame_ready],
-                                              "sequence_started": [self.on_sequence_start],})
+        self.sub = Subscriber(["writer", "gui"], {"frame_ready": [self.on_frame_ready],
+                                              "acquisition_start": [self.on_sequence_start],
+                                              "shutdown": [self.close_me]})
 
     def on_frame_ready(self, event: dict, shape: tuple[int, int], idx: int, meta: dict) -> None:
         return super().frameReady(MDAEvent(**event))
 
+    def on_sequence_start(self, seq: MDASequence) -> None:
+        return super().on_sequence_start(seq)
 
-def viewer_process(viewer_queue, out_pipe, name=None):
+    def close_me(self) -> None:
+        print("VIEWER ASKED TO CLOSE")
+        self.hide()
+        self.sub.stop()
+        self.close()
+
+
+def viewer_process(viewer_queue, in_pipe, name=None):
     app = QApplication([])
 
     set_dark(app)
-    broker = Broker(pub_queue=viewer_queue, auto_start=False)
     if os.path.isfile(name) or os.path.isdir(name):
         # There is a zarr writer writing to a file, viewer will get data from there
         datastore = RemoteZarrStorage(name)
     else:
         # name is the name of a shared memory buffer, viewer will get data from there
         remote_datastore = RemoteDatastore(name)
-        datastore = RemoteZarrWriter(remote_datastore, viewer_queue, store=None, overwrite=True)
+        datastore = RemoteZarrWriter(remote_datastore, viewer_queue,
+                                     store=None, overwrite=True)
 
     view_settings = load_settings("live_view")
     transform = (view_settings.get("rot", 0),
                  view_settings.get("mirror_x", False),
                  view_settings.get("mirror_y", True))
     viewer = RemoteViewer(size=(2048, 2048), transform=transform, datastore=datastore)
-
-    broker.attach(viewer)
-    broker.attach(datastore)
-    broker.start()
+    viewer.pixel_size = 0.056
 
     # save_button = SaveButton(self.datastore, self.viewer.sequence, self.settings,
     #                                 self.mmc.getSystemState().dict())
     # viewer.bottom_buttons.addWidget(self.save_button)
-    viewer.show()
-    out_pipe.send(True)
-    app.exec_()
-    print("Viewer process closing")
+    event = in_pipe.recv()
+    if event:
+        broker = Broker(pub_queue=viewer_queue, auto_start=False)
+        broker.attach(viewer)
+        broker.attach(datastore)
+        broker.start()
+        viewer.setWindowFlags(viewer.windowFlags() & ~QtCore.Qt.WindowStaysOnTopHint)
+        viewer.show()
+        app.exec_()
+    else:
+        del remote_datastore
+        datastore.sub.stop()
+        del datastore
+        viewer.close_me()
+        del viewer
+        app.exit()
+        print("Viewer process closing")
 
 
 if __name__ == "__main__":

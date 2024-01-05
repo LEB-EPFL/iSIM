@@ -1,4 +1,7 @@
 import copy
+import os
+import time
+import multiprocessing
 from isim_control.gui.dark_theme import set_dark
 from qtpy.QtWidgets import QApplication
 from qtpy.QtCore import Signal
@@ -12,6 +15,8 @@ from pymmcore_plus import CMMCorePlus
 from pymmcore_widgets import StageWidget, GroupPresetTableWidget
 
 if __name__ == "__main__":
+
+    os.environ['ZARR_V3_EXPERIMENTAL_API'] = "1"
 
     monogram = False
     app = QApplication([])
@@ -110,8 +115,7 @@ if __name__ == "__main__":
     broker.stop()
     full_settings = frame.get_full_settings(runner.settings)
     save_settings(full_settings)
-    output.close_processes()
+    output.shutdown()
     mmc.setXYPosition(0, 0)
-    print("All processes asked to close")
     if monogram:
         monogram.stop()
