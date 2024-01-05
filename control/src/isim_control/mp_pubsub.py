@@ -189,6 +189,8 @@ def viewer_process(viewer_queue, in_pipe, name=None):
         viewer.setWindowFlags(viewer.windowFlags() & ~QtCore.Qt.WindowStaysOnTopHint)
         viewer.show()
         app.exec_()
+        broker.stop()
+        app.exit()
     else:
         del remote_datastore
         datastore.sub.stop()
@@ -196,7 +198,7 @@ def viewer_process(viewer_queue, in_pipe, name=None):
         viewer.close_me()
         del viewer
         app.exit()
-        print("Viewer process closing")
+    print("Viewer process closing")
 
 
 if __name__ == "__main__":
