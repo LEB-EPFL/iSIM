@@ -12,17 +12,18 @@ from pathlib import Path
 import yaml
 from isim_control.pubsub import Subscriber
 from useq import MDAEvent, MDASequence
+from isim_control.io.remote_datastore import RemoteDatastore
+from pymmcore_widgets._mda._datastore import QOMEZarrDatastore
+
 if TYPE_CHECKING:
     import numpy as np
     import useq
-    from isim_control.io.remote_datastore import RemoteDatastorese
 from isim_control.settings_translate import useq_from_settings
 
 class OMETiffWriter:
-    def __init__(self, folder: Path | str, datastore: RemoteDatastore,
+    def __init__(self, folder: Path | str, datastore: RemoteDatastore|QOMEZarrDatastore,
                  settings:dict | None = None,
-                 mm_config: dict|None = None,
-                 subscriber: bool = True) -> None:
+                 mm_config: dict|None = None) -> None:
         try:
             import tifffile  # noqa: F401
             import yaml
@@ -32,9 +33,6 @@ class OMETiffWriter:
                 "Please `pip install tifffile`. and pyyaml"
             ) from e
 
-        if subscriber:
-            routes = {"new_frame": [self.frameReady]}
-            self.sub = Subscriber(["datastore"], routes)
         self.datastore = datastore
 
         # create an empty OME-TIFF file
@@ -47,11 +45,14 @@ class OMETiffWriter:
         self.n_grid_positions: int = 1
         self.preparing = False
 
-    def frameReady(self, event: dict | MDAEvent | None, shape, idx, meta) -> None:
+    def frameReady(self, event: dict | MDAEvent | None, shape = None, idx = 0, meta = {}) -> None:
         if self.preparing:
             Timer(0.5, self.frameReady, [event, shape, idx, meta]).start()
             return
-        frame = self.datastore.get_frame(idx, shape[0], shape[1])
+        if isinstance(self.datastore, RemoteDatastore):
+            frame = self.datastore.get_frame(idx, shape[0], shape[1])
+        elif isinstance(self.datastore, QOMEZarrDatastore):
+            frame = self.datastore.get_frame(event)
         if event is None:
             return
         elif isinstance(event, dict):

@@ -88,7 +88,6 @@ class RemoteZarrWriter(OMEZarrWriter):
         self.pub = Publisher(pub_queue) or None
 
     def frameReady(self, event: dict, shape: tuple[int, int], idx: int, meta: dict) -> None:
-        t0 = time.perf_counter()
         img = self.datastore.get_frame(idx, shape[0], shape[1])
         super().frameReady(img, MDAEvent(**event), meta)
         # self.frame_ready.emit(MDAEvent(**event))
@@ -189,6 +188,8 @@ def viewer_process(viewer_queue, in_pipe, name=None):
         viewer.setWindowFlags(viewer.windowFlags() & ~QtCore.Qt.WindowStaysOnTopHint)
         viewer.show()
         app.exec_()
+        broker.stop()
+        app.exit()
     else:
         del remote_datastore
         datastore.sub.stop()
@@ -196,7 +197,7 @@ def viewer_process(viewer_queue, in_pipe, name=None):
         viewer.close_me()
         del viewer
         app.exit()
-        print("Viewer process closing")
+    print("Viewer process closing")
 
 
 if __name__ == "__main__":
