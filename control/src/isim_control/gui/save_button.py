@@ -67,11 +67,7 @@ if __name__ == "__main__":
                       z_plan={"range": 3, "step": 1},
                       channels=[{"config": "DAPI", "exposure": 1},
                                 {"config": "FITC", "exposure": 1}])
-    shape = [seq.sizes.get('t', 1),
-             seq.sizes.get('z', 1),
-             seq.sizes.get('c', 1),
-             mmc.getImageHeight(),
-             mmc.getImageWidth()]
+
     datastore = QLocalDataStore(shape, mmcore=mmc)
     mmc.run_mda(seq)
     widget = SaveButton(datastore, seq)
