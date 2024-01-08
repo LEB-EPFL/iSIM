@@ -4,6 +4,7 @@ from qtpy.QtWidgets import (QWidget, QGridLayout, QPushButton, QFileDialog, QMai
                             QVBoxLayout, QHBoxLayout, QCheckBox)
 from qtpy import QtCore, QtGui
 from superqt import fonticon, QRangeSlider
+from useq import MDAEvent
 from fonticon_mdi6 import MDI6
 from tifffile import imsave
 from pathlib import Path
@@ -155,7 +156,8 @@ class Canvas(QWidget):
         self.auto_clim.setChecked(self._clim_mode.get(channel, "auto") == "auto")
         self.auto_clim.blockSignals(block)
 
-    def _on_image_snapped(self, img: np.ndarray | None = None, channel: str|None = None) -> None:
+    def _on_image_snapped(self, img: np.ndarray | None = None, event:MDAEvent|None = None) -> None:
+        channel = event.channel.config
         self._adjust_channel(channel)
         if img is None:
             try:

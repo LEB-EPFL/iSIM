@@ -10,17 +10,19 @@ from isim_control.io.remote_datastore import RemoteDatastore
 from isim_control.io.keyboard import KeyboardListener
 from qtpy.QtWidgets import QApplication
 
-def position_history_process(event_queue, name: str):
+def position_history_process(event_queue, control_queue, pipe, name: str):
     app = QApplication([])
     broker = Broker(pub_queue=event_queue, auto_start=False)
     remote_datastore = RemoteDatastore(name)
-    history = PositionHistory(key_listener=KeyboardListener(),
+    history = PositionHistory(key_listener=KeyboardListener(device="MicroDrive XY Stage",
+                                                            pub_queue=control_queue),
                               datastore=remote_datastore)
     history.sub = Subscriber(["datastore", "sequence"], {"new_frame": [history.frame_ready_datastore],
                               "xy_stage_position_changed": [history.stage_moved_process],})
     broker.attach(history)
     history.show()
     broker.start()
+    pipe.send(True)
     app.exec_()
 
 
@@ -119,7 +121,6 @@ class PositionHistory(QtWidgets.QGraphicsView):
 
     def frame_ready_datastore(self, event, shape, idx, meta):
         frame = self.datastore.get_frame(idx, shape[0], shape[1])
-        print(frame.shape)
         self.increase_values_signal.emit(frame, MDAEvent(**event), meta)
 
     def stage_moved_process(self, name, new_pos0, new_pos1):
@@ -266,6 +267,24 @@ class PositionHistory(QtWidgets.QGraphicsView):
 
     def resizeEvent(self, event):
         self.centerOn(self.now_rect)
+
+def main_mp(mmcore:CMMCorePlus):
+    import multiprocessing as mp
+    from isim_control.mp_pubsub import Relay
+    from isim_control.io.buffered_datastore import BufferedDataStore
+    broker = Broker()
+    relay = Relay(mmcore=mmcore, subscriber=True)
+    buffered_datastore = BufferedDataStore(mmcore=mmcore, create=True, publishers=[relay.pub],
+                                            live_frames=True)
+    process = mp.Process(target=position_history_process,
+                        args=([relay.pub_queue,
+                               broker.pub_queue,
+                               relay.in_conn,
+                                buffered_datastore._shm.name]))
+    process.start()
+    broker.attach(relay)
+    relay.out_conn.recv()
+    return relay, broker
 
 if __name__ == "__main__":
     from pymmcore_plus import CMMCorePlus

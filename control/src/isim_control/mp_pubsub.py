@@ -24,18 +24,20 @@ from psygnal import Signal
 
 class Relay(Thread):
 
-    def __init__(self, mmcore: CMMCorePlus|None = None):
+    def __init__(self, mmcore: CMMCorePlus|None = None, subscriber: bool = False):
         super().__init__()
         self.pub_queue = multiprocessing.Queue()
         self.out_conn, self.in_conn = multiprocessing.Pipe()
         self.pub = Publisher(self.pub_queue)
+        if subscriber:
+            self.sub = Subscriber(["control"],
+                              {"set_relative_xy_position": [self._set_relative_xy_position],})
 
         if mmcore:
             self._mmc = mmcore
             self._mmc.mda.events.sequenceStarted.connect(self.sequenceStarted)
             self._mmc.mda.events.sequenceFinished.connect(self.sequenceFinished)
             self._mmc.events.XYStagePositionChanged.connect(self.XYStagePositionChanged)
-
 
     def sequenceStarted(self, seq: MDASequence) -> None:
         self.pub.publish("sequence", "sequence_started", [seq])
@@ -46,6 +48,8 @@ class Relay(Thread):
     def XYStagePositionChanged(self, name:str, x: float, y: float) -> None:
         self.pub.publish("sequence", "xy_stage_position_changed", [name, x, y])
 
+    def _set_relative_xy_position(self, device: str, x: float, y: float) -> None:
+        self._mmc.setRelativeXYPosition(device, x, y)
 
 
 class RemoteOMETiffWriter(OMETiffWriter):

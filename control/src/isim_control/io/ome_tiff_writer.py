@@ -23,7 +23,8 @@ from isim_control.settings_translate import useq_from_settings
 class OMETiffWriter:
     def __init__(self, folder: Path | str, datastore: RemoteDatastore|QOMEZarrDatastore,
                  settings:dict | None = None,
-                 mm_config: dict|None = None) -> None:
+                 mm_config: dict|None = None,
+                 subscriber: bool =False) -> None:
         try:
             import tifffile  # noqa: F401
             import yaml

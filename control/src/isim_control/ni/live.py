@@ -128,13 +128,13 @@ class LiveTimer(Timer):
 
     def snap_and_get(self):
         self.snap_lock.release()
-        #print(time.perf_counter(), "SNAP")
+        # print(time.perf_counter(), "SNAP")
         try:
             self.snapping.set()
             self._mmc.snapImage()
             self.snapping.clear()
             self._mmc.events.liveFrameReady.emit(self._mmc.getImage(fix=False),
-                                                 self.settings['channel'],
+                                                 MDAEvent(channel=self.settings['channel']),
                                                  self._mmc.getTags())
         except Exception as e:
             #print(e)

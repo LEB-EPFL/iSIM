@@ -105,13 +105,15 @@ if __name__ == "__main__":
     from isim_control.gui.output import OutputGUI
     output = OutputGUI(mmc, settings, broker)
 
-    # from isim_control.gui.position_history import PositionHistory
-    # history = PositionHistory(mmc, key_listener=KeyboardListener(mmc=mmc))
-    # history.show()
+    from isim_control.gui import position_history
+    history_relay, history_broker = position_history.main_mp(mmc)
 
     app.exec_()
 
     # Clean things up
+    history_relay.pub.publish("stop", "stop", [])
+    history_broker.stop()
+
     broker.stop()
     full_settings = frame.get_full_settings(runner.settings)
     save_settings(full_settings)
