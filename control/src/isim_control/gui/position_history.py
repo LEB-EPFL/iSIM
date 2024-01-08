@@ -1,15 +1,33 @@
 from pymmcore_plus import CMMCorePlus
+from useq import MDAEvent
 import operator, time
 import numpy as np
 import copy
 from qtpy import QtCore, QtGui, QtWidgets
+
+from isim_control.pubsub import Broker, Subscriber
+from isim_control.io.remote_datastore import RemoteDatastore
+from isim_control.io.keyboard import KeyboardListener
+
+
+def position_history_process(event_queue, name: str):
+    app = QApplication([])
+    broker = Broker(pub_queue=event_queue, auto_start=False)
+    remote_datastore = RemoteDatastore(name)
+    history = PositionHistory(key_listener=KeyboardListener(),
+                              datastore=remote_datastore)
+    history.sub = Subscriber(["datastore, sequence"], {"new_frame": [history.frame_ready],
+                              "xy_stage_position_changed": [history.stage_moved],})
+    broker.attach(history)
+    history.show()
+    app.exec_()
+
 
 class Colors(object):
     """ Defines colors for easy access in all widgets. """
     def __init__(self):
         self.blue = QtGui.QColor(25, 180, 210, alpha=150)
         self.red = QtGui.QColor(220, 20, 60, alpha=150)
-
 
 class PositionHistory(QtWidgets.QGraphicsView):
     """ This is a widget that records the history of where the stage of the microscope has
@@ -19,11 +37,11 @@ class PositionHistory(QtWidgets.QGraphicsView):
     xy_stage_position_python = QtCore.Signal(object)
     increase_values_signal = QtCore.Signal(object, object, object)
 
-    def __init__(self, mmcore: CMMCorePlus, key_listener: QtCore.QObject | None = None,
-                 parent:QtWidgets.QWidget=None):
+    def __init__(self, mmcore: CMMCorePlus|None = None, key_listener: QtCore.QObject | None = None,
+                 datastore: RemoteDatastore|None =  None, parent:QtWidgets.QWidget=None):
         super().__init__()
-        self.mmc = mmcore
         self.max_img = 0
+        self.datastore = datastore
 
         # Set the properties for the window so that everything is shown and we don't have Scrollbars
         self.view_size = (3000, 3000)
@@ -82,19 +100,24 @@ class PositionHistory(QtWidgets.QGraphicsView):
         self.setDragMode(QtWidgets.QGraphicsView.DragMode.ScrollHandDrag)
 
         # Connect to mmc signals
-        self.mmc.events.XYStagePositionChanged.connect(self.stage_moved)
-        # self.mmc.events.imageSnapped.connect(self.increase_values)
-        self.mmc.mda.events.frameReady.connect(self.frame_ready)
-        self.mmc.events.liveFrameReady.connect(self.frame_ready)
+        if mmcore:
+            self.mmc = mmcore
+            self.mmc.events.XYStagePositionChanged.connect(self.stage_moved)
+            # self.mmc.events.imageSnapped.connect(self.increase_values)
+            self.mmc.mda.events.frameReady.connect(self.frame_ready)
+            self.mmc.events.liveFrameReady.connect(self.frame_ready)
         self.increase_values_signal.connect(self.increase_values)
 
         if key_listener:
             self.key_listener = key_listener
             self.installEventFilter(self.key_listener)
 
-
     def frame_ready(self, frame, event, metadata):
         self.increase_values_signal.emit(frame, event, metadata)
+
+    def frame_ready_datastore(self, event, shape, idx, meta):
+        frame = self.datastore.get_frame(idx, shape[0], shape[1])
+        self.increase_values_signal.emit(frame, MDAEvent(**event), meta)
 
     def stage_moved(self, name, new_pos0, new_pos1):
         # print("STAGE MOVED IN HISTORY", new_pos0, new_pos1)
