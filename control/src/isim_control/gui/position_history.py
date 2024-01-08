@@ -8,7 +8,7 @@ from qtpy import QtCore, QtGui, QtWidgets
 from isim_control.pubsub import Broker, Subscriber
 from isim_control.io.remote_datastore import RemoteDatastore
 from isim_control.io.keyboard import KeyboardListener
-
+from qtpy.QtWidgets import QApplication
 
 def position_history_process(event_queue, name: str):
     app = QApplication([])
@@ -16,10 +16,11 @@ def position_history_process(event_queue, name: str):
     remote_datastore = RemoteDatastore(name)
     history = PositionHistory(key_listener=KeyboardListener(),
                               datastore=remote_datastore)
-    history.sub = Subscriber(["datastore, sequence"], {"new_frame": [history.frame_ready],
-                              "xy_stage_position_changed": [history.stage_moved],})
+    history.sub = Subscriber(["datastore", "sequence"], {"new_frame": [history.frame_ready_datastore],
+                              "xy_stage_position_changed": [history.stage_moved_process],})
     broker.attach(history)
     history.show()
+    broker.start()
     app.exec_()
 
 
@@ -34,7 +35,7 @@ class PositionHistory(QtWidgets.QGraphicsView):
     been for the given sample. It visualizes the time spent at a specific position on a grid
     with rectangles that get brighter for the more time spent at a position. This is also
     dependent on if the laser light was on at the given time."""
-    xy_stage_position_python = QtCore.Signal(object)
+    xy_stage_position = QtCore.Signal(str, float, float)
     increase_values_signal = QtCore.Signal(object, object, object)
 
     def __init__(self, mmcore: CMMCorePlus|None = None, key_listener: QtCore.QObject | None = None,
@@ -106,7 +107,8 @@ class PositionHistory(QtWidgets.QGraphicsView):
             # self.mmc.events.imageSnapped.connect(self.increase_values)
             self.mmc.mda.events.frameReady.connect(self.frame_ready)
             self.mmc.events.liveFrameReady.connect(self.frame_ready)
-        self.increase_values_signal.connect(self.increase_values)
+        self.increase_values_signal.connect(self.increase_values, QtCore.Qt.QueuedConnection)
+        self.xy_stage_position.connect(self.stage_moved, QtCore.Qt.QueuedConnection)
 
         if key_listener:
             self.key_listener = key_listener
@@ -117,10 +119,13 @@ class PositionHistory(QtWidgets.QGraphicsView):
 
     def frame_ready_datastore(self, event, shape, idx, meta):
         frame = self.datastore.get_frame(idx, shape[0], shape[1])
+        print(frame.shape)
         self.increase_values_signal.emit(frame, MDAEvent(**event), meta)
 
+    def stage_moved_process(self, name, new_pos0, new_pos1):
+        self.xy_stage_position.emit(name, new_pos0, new_pos1)
+
     def stage_moved(self, name, new_pos0, new_pos1):
-        # print("STAGE MOVED IN HISTORY", new_pos0, new_pos1)
         new_pos = [new_pos0, new_pos1]
         self.stage_pos = new_pos
         new_pos = [x/10 for x in new_pos]
@@ -130,7 +135,6 @@ class PositionHistory(QtWidgets.QGraphicsView):
         self.my_pixmap.setPixmap(QtGui.QPixmap.fromImage(self.map))
         self.now_rect.setPos(QtCore.QPointF(pos[0], pos[1]))
         self.repaint()
-        # self.xy_stage_position_python.emit(self.stage_pos)
 
     def rectangle_pos(self, pos):
         rect_pos = [int(self.sample_size[0]*0.5 + pos[0] - self.fov_size[0]/2),
@@ -269,6 +273,8 @@ if __name__ == "__main__":
     import useq, time
     from qtpy.QtCore import QTimer
 
+    MP = True
+
     mmc = CMMCorePlus()
     mmc.loadSystemConfiguration()
 
@@ -286,10 +292,19 @@ if __name__ == "__main__":
     # live = LiveButton(mmcore=mmc)
     # live.show()
 
-    from isim_control.gui.position_history import PositionHistory
-    history = PositionHistory(mmc)
-    history.show()
-
+    if not MP:
+        history = PositionHistory(mmc)
+        history.show()
+    else:
+        from isim_control.mp_pubsub import Relay
+        from isim_control.io.buffered_datastore import BufferedDataStore
+        import multiprocessing as mp
+        relay = Relay(mmc)
+        buffered_datastore = BufferedDataStore(mmcore=mmc, create=True, publishers=[relay.pub])
+        process = mp.Process(target=position_history_process,
+                            args=([relay.pub_queue,
+                                   buffered_datastore._shm.name]))
+        process.start()
     # timers = []
     # for i in range(11):
     #     timer = QTimer()
@@ -300,8 +315,10 @@ if __name__ == "__main__":
     #     timer.start(5000 * i)
     #     timers.append(timer)
 
-    time.sleep(1)
-    seq = useq.MDASequence(time_plan={"interval": 0.5, "loops": 100})
+    time.sleep(3)
+    seq = useq.MDASequence(time_plan={"interval": 1/3, "loops": 100})
     mmc.run_mda(seq)
-
     app.exec_()
+
+    if MP:
+        relay.pub.publish("stop", "stop", [])

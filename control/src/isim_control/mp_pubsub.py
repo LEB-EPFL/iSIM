@@ -34,12 +34,17 @@ class Relay(Thread):
             self._mmc = mmcore
             self._mmc.mda.events.sequenceStarted.connect(self.sequenceStarted)
             self._mmc.mda.events.sequenceFinished.connect(self.sequenceFinished)
+            self._mmc.events.XYStagePositionChanged.connect(self.XYStagePositionChanged)
+
 
     def sequenceStarted(self, seq: MDASequence) -> None:
         self.pub.publish("sequence", "sequence_started", [seq])
 
     def sequenceFinished(self, seq: MDASequence) -> None:
         self.pub.publish("sequence", "sequence_finished", [seq])
+
+    def XYStagePositionChanged(self, name:str, x: float, y: float) -> None:
+        self.pub.publish("sequence", "xy_stage_position_changed", [name, x, y])
 
 
 

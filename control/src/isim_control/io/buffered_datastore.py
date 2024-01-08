@@ -24,10 +24,12 @@ class BufferedDataStore(BufferedArray):
         return super().__new__(BufferedDataStore, *args, capacity=CAPACITY, dtype=np.uint16,
                                 **kwargs)
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, live_frames:bool = False, **kwargs):
         super().__init__()
         if self.mmc:
             self.mmc.mda.events.frameReady.connect(self.new_frame)
+            if live_frames:
+                self.mmc.liveFrameReady.connect(self.new_frame)
 
 
     def new_frame(self, img: np.ndarray, event: MDAEvent, meta:dict):
