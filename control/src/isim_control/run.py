@@ -14,7 +14,23 @@ from isim_control.gui.main_window import iSIM_StageWidget, MainWindow
 from pymmcore_plus import CMMCorePlus
 from pymmcore_widgets import StageWidget, GroupPresetTableWidget
 
+import threading
+import logging
+import sys
+
 if __name__ == "__main__":
+    logger = logging.getLogger(__name__)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
+    # def open_audit_hook(name, *args):
+    #     logger.debug(f"Opening {name} with {args}")
+
+    # sys.addaudithook(open_audit_hook)
+
 
     os.environ['ZARR_V3_EXPERIMENTAL_API'] = "1"
 
@@ -61,8 +77,7 @@ if __name__ == "__main__":
         mmc.mda.set_engine(acq_engine)
 
         monogram = MonogramCC(mmcore=mmc, publisher=Publisher(broker.pub_queue))
-        stages = iSIM_StageWidget(mmc, key_listener=KeyboardListener(mmc=mmc))
-        stages.show()
+        stage = iSIM_StageWidget(mmc)
     except FileNotFoundError:
         from unittest.mock import MagicMock
         acq_engine = MagicMock()
@@ -74,12 +89,10 @@ if __name__ == "__main__":
         mmc.setProperty("Camera", "OnCameraCCDXSize", 2048)
         mmc.setProperty("Camera", "OnCameraCCDYSize", 2048)
         stage = StageWidget("XY", mmcore=mmc)
-        stage.show()
 
 
     from isim_control.gui.preview import iSIMPreview
-    preview = iSIMPreview(mmcore=mmc, key_listener=KeyboardListener(mmc=mmc))
-    preview.show()
+    preview = iSIMPreview(mmcore=mmc)
 
     runner = iSIMRunner(mmc,
                         live_engine=live_engine,
@@ -92,32 +105,49 @@ if __name__ == "__main__":
     default_settings = copy.deepcopy(settings)
 
     #GUI
-    frame = MainWindow(Publisher(broker.pub_queue), settings, key_listener=KeyboardListener(mmc=mmc))
+    frame = MainWindow(Publisher(broker.pub_queue), settings)
     broker.attach(frame)
-    broker.attach(frame.mda_window.save_settings)
+    broker.attach(frame.mda_window)
     frame.update_from_settings(default_settings)
 
     group_presets = GroupPresetTableWidget(mmcore=mmc)
     frame.main.layout().addWidget(group_presets, 5, 0, 1, 3)
     group_presets.show() # needed to keep events alive?
-    frame.show()
 
     from isim_control.gui.output import OutputGUI
-    output = OutputGUI(mmc, settings, broker)
+    output = OutputGUI(mmc, settings, broker, Publisher(broker.pub_queue))
 
     from isim_control.gui import position_history
-    history_relay, history_broker = position_history.main_mp(mmc)
+    history_relay, history_broker, history_process = position_history.main_mp(mmc, output.buffered_datastore)
 
+    key_listener = KeyboardListener(mmc=mmc)
+    app.installEventFilter(key_listener)
+
+    stage.show()
+    preview.show()
+    frame.show()
     app.exec_()
 
     # Clean things up
+    history_relay.pub.publish("gui", "shutdown", [])
     history_relay.pub.publish("stop", "stop", [])
     history_broker.stop()
+    history_relay.sub.stop()
+    history_process.join()
+    logging.debug("History process closed")
+
 
     broker.stop()
     full_settings = frame.get_full_settings(runner.settings)
     save_settings(full_settings)
     output.shutdown()
+    logging.debug("Output GUI closed")
+
     mmc.setXYPosition(0, 0)
     if monogram:
         monogram.stop()
+    logging.debug("App closed")
+    # Not sure why we need this. No more brokers or subscribers are running at this point
+    # There are active QueueFeederThreads that are spawned by the multiprocessing.Queues,
+    # But those are al daemons, so they should be cleaned up when the main thread exits
+    os._exit(os.EX_OK)

@@ -8,6 +8,9 @@ from isim_control.settings_translate import useq_from_settings
 import time
 from threading import Timer
 
+import logging
+
+
 class iSIMRunner:
     def __init__(self, mmcore: CMMCorePlus, live_engine: live.LiveEngine,
                  acquisition_engine: acquisition.AcquisitionEngine, devices: devices.NIDeviceGroup,
@@ -54,6 +57,7 @@ class iSIMRunner:
         self.mmc.run_mda(useq_from_settings(self.settings))
 
     def _on_live_toggle(self, toggled):
+        logging.debug(f"Live toggle in Runner {toggled}")
         if self.acquisition_engine.running.is_set():
             return
         if toggled:
@@ -61,8 +65,14 @@ class iSIMRunner:
             self.devices.update_settings(self.settings)
             self.live_engine.update_settings(self.settings)
             self.live_engine._on_sequence_started()
+            logging.debug(f"Live started from Runner")
         else:
             self.live_engine._on_sequence_stopped()
+            while self.live_engine.timer and self.live_engine.timer.running:
+                time.sleep(0.05)
+                logging.debug(f"Waiting for live stop in Runner")
+
+            logging.debug(f"Live stopped from Runner")
 
     def _on_snap(self, *_):
         if self.acquisition_engine.running.is_set():

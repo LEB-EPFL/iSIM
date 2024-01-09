@@ -14,9 +14,10 @@ from qtpy.QtCore import Signal, QTimer
 from qtpy.QtWidgets import QWidget
 import time
 
+import logging
+import os
+import ctypes
 import multiprocessing
-import numpy as np
-from _queue import Empty
 
 
 class CMMCRelay(Publisher):
@@ -30,7 +31,8 @@ class CMMCRelay(Publisher):
 
 
 class OutputGUI(QWidget):
-    def __init__(self, mmcore: CMMCorePlus, settings: iSIMSettings, broker: Broker):
+    def __init__(self, mmcore: CMMCorePlus, settings: iSIMSettings, broker: Broker,
+                 publisher: Publisher):
         super().__init__()
         self.mmc = mmcore
         self.broker = broker
@@ -42,12 +44,14 @@ class OutputGUI(QWidget):
                   "live_button_clicked": [self._on_live_toggle],}
         self.sub = Subscriber(["gui", "sequence"], routes)
         self.broker.attach(self)
+        self.pub = publisher
 
         self.writer_relay = Relay(self.mmc)
         self.viewer_relay = Relay(self.mmc)
         self.buffered_datastore = BufferedDataStore(mmcore=self.mmc, create=True,
                                                     publishers=[self.writer_relay.pub,
-                                                                self.viewer_relay.pub])
+                                                                self.viewer_relay.pub],
+                                                    live_frames=True)
 
         self.settings = settings
 
@@ -73,10 +77,12 @@ class OutputGUI(QWidget):
         self.viewer_process = multiprocessing.Process(target=viewer_process,
                                                  args=([self.viewer_relay.pub_queue,
                                                         self.viewer_relay.in_conn,
+                                                        self.viewer_relay.out_conn,
                                                         self.buffered_datastore._shm.name]),
                                                  name="viewer")
         self.viewer_process.start()
-
+        self.viewer_id = self.viewer_relay.in_conn.recv()
+        self.pub.publish("gui", "output_ready", [])
 
     def make_viewer(self, settings:dict = None):
         self.size = (self.mmc.getImageHeight(), self.mmc.getImageWidth())
@@ -86,6 +92,8 @@ class OutputGUI(QWidget):
             self.writer_relay.pub.publish("datastore", "reset", [self.settings, self.mmc.getSystemState().dict()])
         else:
             self.writer_relay.pub.publish("stop", "stop", [])
+        # The viewer process does not have the right to set a window to the foreground
+        ctypes.windll.user32.SetForegroundWindow(self.viewer_id)
 
     def get_shape(self, settings:dict):
         sequence = useq_from_settings(settings)
@@ -114,6 +122,6 @@ class OutputGUI(QWidget):
         self.writer_relay.out_conn.send(False)
         self.viewer_relay.out_conn.send(False)
         self.writer_process.join()
-        print("Writer process closed")
+        logging.debug("Writer process closed")
         self.viewer_process.join()
-        print("Viewer process closed")
+        logging.debug("Viewer process closed")

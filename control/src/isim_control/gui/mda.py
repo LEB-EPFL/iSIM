@@ -23,8 +23,8 @@ class iSIMMDAWidget(QWidgetRestore):
         self.isim = iSIMSettingsWidget()
         self.save_settings = SaverWidget()
         self.save_settings.set_state(settings)
-
         self.pub = publisher
+
         self.setWindowTitle("iSIM MDA")
         self.run_buttons = RunButtons(publisher, self)
         self.setLayout(QVBoxLayout())
@@ -56,6 +56,10 @@ class iSIMMDAWidget(QWidgetRestore):
                     column_info.setCheckState(table, idx, table._get_selector_col(), check_value)
                 case 'LED':
                     column_info.setCheckState(table, idx, table._get_selector_col(), check_value)
+
+        routes = {"output_ready": [self.run_buttons.activate_run_btn],
+                  "acquisition_finished": [self.save_settings._increase_folder_number]}
+        self.sub = Subscriber(["gui"], routes)
 
     def setValue(self, settings: dict):
         seq = useq_from_settings(settings)
@@ -128,7 +132,11 @@ class RunButtons(QWidget):
         self.pause_btn.setIcon(fonticon.icon(MDI6.pause_circle_outline, color="green"))
         self.pause_btn.setText("Pause")
         self.cancel_btn.hide()
+        self.run_btn.setDisabled(True)
         self.pause = False
+
+    def activate_run_btn(self):
+        self.run_btn.setDisabled(False)
 
 
 class LaserPowers(QWidget):
@@ -190,8 +198,6 @@ class SaverWidget(QWidget):
         self.layout().addWidget(self.save)
         self.path = QLineEdit("C:/Users/stepp/Desktop/OMETIFF_000")
         self.layout().addWidget(self.path)
-        routes = {"acquisition_finished": [self._increase_folder_number]}
-        self.sub = Subscriber(["gui"], routes)
 
     def _increase_folder_number(self):
         path = self.path.text()

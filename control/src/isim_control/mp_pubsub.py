@@ -4,9 +4,10 @@ import zarr
 import numpy as np
 import time
 import os
+import ctypes
 from pathlib import Path
 
-from qtpy.QtWidgets import QApplication
+from qtpy.QtWidgets import QApplication, QMainWindow
 from qtpy import QtCore
 
 from isim_control.gui.dark_theme import set_dark
@@ -72,7 +73,7 @@ def tiff_writer_process(queue, settings, mm_config, in_conn, name):
     print("Writer ready")
     event = in_conn.recv()
     if event:
-        broker = Broker(pub_queue=queue, auto_start=False)
+        broker = Broker(pub_queue=queue, auto_start=False, name="writer_broker")
         broker.attach(writer)
         broker.start()
     else:
@@ -97,8 +98,11 @@ class RemoteZarrWriter(OMEZarrWriter):
         self.pub = Publisher(pub_queue) or None
 
     def frameReady(self, event: dict, shape: tuple[int, int], idx: int, meta: dict) -> None:
+        print("FRAME READY IN REMOTE WRITER")
+        t0 = time.perf_counter()
         img = self.datastore.get_frame(idx, shape[0], shape[1])
         super().frameReady(img, MDAEvent(**event), meta)
+        print("FRAME WRITTEN TO REMOTE WRITER", round((time.perf_counter() - t0)*1000))
         # self.frame_ready.emit(MDAEvent(**event))
         if self.pub:
             self.pub.publish("writer", "frame_ready", [event, img.shape, idx, meta])
@@ -113,7 +117,10 @@ class RemoteZarrWriter(OMEZarrWriter):
     def get_frame(self, event: MDAEvent) -> np.ndarray:
         key = f'p{event.index.get("p", 0)}'
         ary = self._arrays[key]
-        index = tuple(event.index.get(k) for k in self._used_axes)
+        try:
+            index = tuple(event.index.get(k) for k in self._used_axes)
+        except AttributeError:
+            self.sequence_started(event.sequence)
         data: np.ndarray = ary[index]
         return data
 
@@ -165,7 +172,7 @@ class RemoteViewer(StackViewer):
         self.close()
 
 
-def viewer_process(viewer_queue, in_pipe, name=None):
+def viewer_process(viewer_queue, in_pipe, out_pipe, name=None):
     app = QApplication([])
 
     set_dark(app)
@@ -184,20 +191,20 @@ def viewer_process(viewer_queue, in_pipe, name=None):
                  view_settings.get("mirror_y", True))
     viewer = RemoteViewer(size=(2048, 2048), transform=transform, datastore=datastore)
     viewer.pixel_size = 0.056
-
-    # save_button = SaveButton(self.datastore, self.viewer.sequence, self.settings,
-    #                                 self.mmc.getSystemState().dict())
-    # viewer.bottom_buttons.addWidget(self.save_button)
+    out_pipe.send(int(viewer.winId()))
+    save_button = SaveButton(self.datastore, self.viewer.sequence, self.settings,
+                                    self.mmc.getSystemState().dict())
+    viewer.bottom_buttons.addWidget(self.save_button)
     event = in_pipe.recv()
     if event:
-        broker = Broker(pub_queue=viewer_queue, auto_start=False)
+        broker = Broker(pub_queue=viewer_queue, auto_start=False, name="viewer_broker")
         broker.attach(viewer)
         broker.attach(datastore)
         broker.start()
-        viewer.setWindowFlags(viewer.windowFlags() & ~QtCore.Qt.WindowStaysOnTopHint)
         viewer.show()
         app.exec_()
         broker.stop()
+        print("Viewer process closing")
         app.exit()
     else:
         del remote_datastore
@@ -205,8 +212,8 @@ def viewer_process(viewer_queue, in_pipe, name=None):
         del datastore
         viewer.close_me()
         del viewer
+        print("Viewer process closing")
         app.exit()
-    print("Viewer process closing")
 
 
 if __name__ == "__main__":

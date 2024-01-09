@@ -18,7 +18,6 @@ class BufferedDataStore(BufferedArray):
         self.mmc = kwargs.get("mmcore", None)
         self.pubs = kwargs.get('publishers', None)
         self.live_frames = kwargs.get("live_frames", None)
-        print(self.live_frames)
         if self.live_frames:
             del kwargs['live_frames']
         if self.mmc:
@@ -33,11 +32,19 @@ class BufferedDataStore(BufferedArray):
         if self.mmc:
             self.mmc.mda.events.frameReady.connect(self.new_frame)
             if self.live_frames:
-                print("LIVE FRAMES CONNECTED")
-                self.mmc.events.liveFrameReady.connect(self.new_frame)
+                self.mmc.events.liveFrameReady.connect(self.new_live_frame)
 
+    def new_live_frame(self, img: np.ndarray, event: MDAEvent, meta:dict):
+        idx, meta = self.put_and_prepare(img, meta)
+        for pub in self.pubs:
+            pub.publish("datastore", "new_live_frame", [event.model_dump(), img.shape, idx, meta])
 
     def new_frame(self, img: np.ndarray, event: MDAEvent, meta:dict):
+        idx, meta = self.put_and_prepare(img, meta)
+        for pub in self.pubs:
+            pub.publish("datastore", "new_frame", [event.model_dump(), img.shape, idx, meta])
+
+    def put_and_prepare(self, img: np.ndarray, meta:dict):
         idx = self._write_idx
         t0 = time.perf_counter()
         self.put(img)
@@ -47,8 +54,7 @@ class BufferedDataStore(BufferedArray):
             del meta['Event']
         except:
             pass
-        for pub in self.pubs:
-            pub.publish("datastore", "new_frame", [event.model_dump(), img.shape, idx, meta])
+        return idx, meta
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-from qtpy import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets, QtGui
 from pymmcore_plus import CMMCorePlus
 from isim_control.pubsub import Publisher
 import warnings
@@ -28,7 +28,7 @@ class KeyboardListener(QtCore.QObject):
 
     def eventFilter(self, obj, event):
         #Check if it's a key event
-        if not event.type() == 51:
+        if not isinstance(event, QtGui.QKeyEvent):
             return False
         size_adjust = 10
         fov = (114/size_adjust, 114/size_adjust)
@@ -38,19 +38,22 @@ class KeyboardListener(QtCore.QObject):
             move_modifier = 0.05 * size_adjust
         else:
             move_modifier = 1 * size_adjust
-
         match event.key():
             case 16777236:
-                self._set_relative_xy_position(self.device, fov[0] * move_modifier, 0)
+                if event.type() == 51:
+                    self._set_relative_xy_position(self.device, fov[0] * move_modifier, 0)
                 return True
             case 16777234:
-                self._set_relative_xy_position(self.device, - fov[0] * move_modifier, 0)
+                if event.type() == 51:
+                    self._set_relative_xy_position(self.device, - fov[0] * move_modifier, 0)
                 return True
             case 16777235:
-                self._set_relative_xy_position(self.device, 0, fov[1] * move_modifier)
+                if event.type() == 51:
+                    self._set_relative_xy_position(self.device, 0, fov[1] * move_modifier)
                 return True
             case 16777237:
-                self._set_relative_xy_position(self.device, 0, - fov[1] * move_modifier)
+                if event.type() == 51:
+                    self._set_relative_xy_position(self.device, 0, - fov[1] * move_modifier)
                 return True
         return False
 

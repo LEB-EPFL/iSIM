@@ -113,7 +113,7 @@ class AcquisitionEngine(MDAEngine):
         event_dict = event.model_dump()
         event_dict['exposure'] = None
         event_dict['z_pos'] = None
-        if self.start_xy_position and event_dict['x_pos']:
+        if self.start_xy_position and not event_dict['x_pos'] is None:
             event_dict['x_pos'] = event_dict['x_pos'] + self.start_xy_position[0]
             event_dict['y_pos'] = event_dict['y_pos'] + self.start_xy_position[1]
         return MDAEvent(**event_dict)

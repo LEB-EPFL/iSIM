@@ -5,8 +5,8 @@ from threading import Thread
 
 class Broker(Thread):
     def __init__(self, pub_queue: multiprocessing.Queue | None = None,
-                 auto_start: bool = True):
-        super().__init__()
+                 auto_start: bool = True, name:str = None):
+        super().__init__(name=name)
         self.subscribers = set()
         self.pub_queue = pub_queue or multiprocessing.Queue()
         self.stop_requested = False
@@ -19,6 +19,7 @@ class Broker(Thread):
     def route(self, topic, message: str, values: list):
         for subscriber in self.subscribers:
             if topic in subscriber.sub.topics:
+                # print(self.name, topic, subscriber, message)
                 if message in subscriber.sub.routes.keys():
                     subscriber.sub.sub_queue.put({"event": message,
                                                 "values": values})
@@ -31,7 +32,13 @@ class Broker(Thread):
                 message = self.pub_queue.get(timeout=0.5)
                 self.route(message["topic"], message["event"], message["values"])
             except Empty:
+                # print("Broker", self.name)
                 if self.stop_requested:
+                    # while not self.pub_queue.empty():
+                    #     self.pub_queue.get()
+                    # self.pub_queue.close()
+                    # self.pub_queue.join_thread()
+                    # del self.pub_queue
                     break
                 else:
                     continue
@@ -40,6 +47,7 @@ class Broker(Thread):
         self.stop_requested = True
         for subscriber in self.subscribers:
             subscriber.sub.stop()
+
 
 
 class Publisher():
@@ -71,12 +79,21 @@ class Subscriber(Thread):
         while True:
             try:
                 message = self.sub_queue.get(timeout=0.5)
+                # self.sub_queue._thread.name = ", ".join(self.topics)
                 self.receive(message["event"], message["values"])
             except Empty:
+                # print("Subscriber", self.topics)
                 if self.stop_requested:
+                    # while not self.sub_queue.empty():
+                    #     self.sub_queue.get()
+                    # self.sub_queue.close()
+                    # self.sub_queue.join_thread()
+                    # del self.sub_queue
                     break
                 else:
                     continue
+            except OSError:
+                break
 
     def stop(self):
         self.stop_requested = True

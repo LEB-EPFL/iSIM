@@ -4,26 +4,38 @@ import operator, time
 import numpy as np
 import copy
 from qtpy import QtCore, QtGui, QtWidgets
+from threading import Timer
 
 from isim_control.pubsub import Broker, Subscriber
 from isim_control.io.remote_datastore import RemoteDatastore
 from isim_control.io.keyboard import KeyboardListener
 from qtpy.QtWidgets import QApplication
 
+import multiprocessing as mp
+from isim_control.mp_pubsub import Relay
+from isim_control.io.buffered_datastore import BufferedDataStore
+
 def position_history_process(event_queue, control_queue, pipe, name: str):
     app = QApplication([])
-    broker = Broker(pub_queue=event_queue, auto_start=False)
+    broker = Broker(pub_queue=event_queue, auto_start=False, name="history_broker")
     remote_datastore = RemoteDatastore(name)
-    history = PositionHistory(key_listener=KeyboardListener(device="MicroDrive XY Stage",
-                                                            pub_queue=control_queue),
-                              datastore=remote_datastore)
-    history.sub = Subscriber(["datastore", "sequence"], {"new_frame": [history.frame_ready_datastore],
-                              "xy_stage_position_changed": [history.stage_moved_process],})
+    history = PositionHistory(datastore=remote_datastore)
+    history.sub = Subscriber(["datastore", "sequence", "gui"],
+                             {"new_frame": [history.frame_ready_datastore],
+                              "new_live_frame": [history.frame_ready_datastore],
+                              "xy_stage_position_changed": [history.stage_moved_process],
+                              "shutdown": [history.shutdown]})
     broker.attach(history)
-    history.show()
     broker.start()
+    key_listener=KeyboardListener(device="MicroDrive XY Stage", pub_queue=control_queue)
+    app.installEventFilter(key_listener)
     pipe.send(True)
+    history.show()
     app.exec_()
+    broker.stop()
+    time.sleep(1)
+    print("History process closing")
+    app.exit()
 
 
 class Colors(object):
@@ -39,10 +51,15 @@ class PositionHistory(QtWidgets.QGraphicsView):
     dependent on if the laser light was on at the given time."""
     xy_stage_position = QtCore.Signal(str, float, float)
     increase_values_signal = QtCore.Signal(object, object, object)
+    close_me = QtCore.Signal()
 
-    def __init__(self, mmcore: CMMCorePlus|None = None, key_listener: QtCore.QObject | None = None,
+    def __init__(self, mmcore: CMMCorePlus|None = None,
                  datastore: RemoteDatastore|None =  None, parent:QtWidgets.QWidget=None):
-        super().__init__()
+        super().__init__(parent=parent)
+        self.qt_settings = QtCore.QSettings("iSIM", self.__class__.__name__)
+        # Initial window size/pos last saved. Use default values for first time
+        self.resize(self.qt_settings.value("size", QtCore.QSize(270, 225)))
+        self.move(self.qt_settings.value("pos", QtCore.QPoint(50, 50)))
         self.max_img = 0
         self.datastore = datastore
 
@@ -109,12 +126,11 @@ class PositionHistory(QtWidgets.QGraphicsView):
             # self.mmc.events.imageSnapped.connect(self.increase_values)
             self.mmc.mda.events.frameReady.connect(self.frame_ready)
             self.mmc.events.liveFrameReady.connect(self.frame_ready)
-        self.increase_values_signal.connect(self.increase_values, QtCore.Qt.QueuedConnection)
-        self.xy_stage_position.connect(self.stage_moved, QtCore.Qt.QueuedConnection)
+        self.increase_values_signal.connect(self.increase_values)#, QtCore.Qt.QueuedConnection)
+        self.xy_stage_position.connect(self.stage_moved)
+        self.close_me.connect(self.close)
 
-        if key_listener:
-            self.key_listener = key_listener
-            self.installEventFilter(self.key_listener)
+        self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
 
     def frame_ready(self, frame, event, metadata):
         self.increase_values_signal.emit(frame, event, metadata)
@@ -268,23 +284,33 @@ class PositionHistory(QtWidgets.QGraphicsView):
     def resizeEvent(self, event):
         self.centerOn(self.now_rect)
 
-def main_mp(mmcore:CMMCorePlus):
-    import multiprocessing as mp
-    from isim_control.mp_pubsub import Relay
-    from isim_control.io.buffered_datastore import BufferedDataStore
+    def shutdown(self):
+        # self.hide()
+        self.sub.stop()
+        print("Shutting down PositionHistory")
+        self.close_me.emit()
+        print("PositionHistory close called")
+
+    def closeEvent(self, event):
+        print("CLose event called")
+        self.qt_settings.setValue("size", self.size())
+        self.qt_settings.setValue("pos", self.pos())
+        return super().closeEvent(event)
+
+def main_mp(mmcore:CMMCorePlus, datastore:RemoteDatastore):
     broker = Broker()
     relay = Relay(mmcore=mmcore, subscriber=True)
-    buffered_datastore = BufferedDataStore(mmcore=mmcore, create=True, publishers=[relay.pub],
-                                            live_frames=True)
     process = mp.Process(target=position_history_process,
                         args=([relay.pub_queue,
                                broker.pub_queue,
                                relay.in_conn,
-                                buffered_datastore._shm.name]))
+                                datastore._shm.name]))
+    process.name = "history_process"
+    datastore.pubs.append(relay.pub)
     process.start()
     broker.attach(relay)
     relay.out_conn.recv()
-    return relay, broker
+    return relay, broker, process
 
 if __name__ == "__main__":
     from pymmcore_plus import CMMCorePlus
