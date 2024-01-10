@@ -133,6 +133,7 @@ class Canvas(QWidget):
             return
         self.auto_clim.setChecked(False)
         self._clims[self.last_channel] = (value[0], value[1])
+        self.image.clim = (value[0], value[1])
 
     def update_auto(self, state: int) -> None:
         if state == 2:
