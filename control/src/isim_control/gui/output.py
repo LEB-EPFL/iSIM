@@ -8,14 +8,11 @@ from isim_control.mp_pubsub import Relay, tiff_writer_process, viewer_process
 
 # from isim_control.gui.save_button import SaveButton
 from isim_control.io.buffered_datastore import BufferedDataStore
-
-
-from qtpy.QtCore import Signal, QTimer
 from qtpy.QtWidgets import QWidget
 import time
 
 import logging
-import os
+from threading import Timer
 import ctypes
 import multiprocessing
 
@@ -40,7 +37,7 @@ class OutputGUI(QWidget):
 
         routes = {"acquisition_start": [self.make_viewer],
                   "acquisition_end": [self._on_acquisition_end],
-                  #"settings_change": [self._on_settings_change],
+                  "settings_change": [self._on_settings_change],
                   "live_button_clicked": [self._on_live_toggle],}
         self.sub = Subscriber(["gui", "sequence"], routes)
         self.broker.attach(self)
@@ -58,7 +55,14 @@ class OutputGUI(QWidget):
         self.last_live_stop = time.perf_counter()
         self.mm_config = None
         self.viewer = None
+        self.system_state = self.mmc.getSystemState().dict()
         self.start_processes()
+
+    def _on_settings_change(self, keys, value):
+        self.settings.set_by_path(keys, value)
+        self.viewer_relay.pub.publish("gui", "settings_change", [self.settings])
+        # This can take ~1s, so do it here instead of when the sequence starts
+        self.system_state = self.mmc.getSystemState().dict()
 
     def _on_acquisition_end(self):
         self.close_remote_brokers()
@@ -68,7 +72,7 @@ class OutputGUI(QWidget):
         self.writer_process = multiprocessing.Process(target=tiff_writer_process,
                                                  args=([self.writer_relay.pub_queue,
                                                         self.settings,
-                                                        self.mmc.getSystemState().dict(),
+                                                        self.system_state,
                                                         self.writer_relay.in_conn,
                                                         self.buffered_datastore._shm.name]),
                                                  name="writer")
@@ -86,14 +90,18 @@ class OutputGUI(QWidget):
 
     def make_viewer(self, settings:dict = None):
         self.size = (self.mmc.getImageHeight(), self.mmc.getImageWidth())
-        self.viewer_relay.pub.publish("gui", "acquisition_start", [useq_from_settings(self.settings)])
+        self.viewer_relay.pub.publish("gui", "acquisition_start", [useq_from_settings(self.settings),
+                                                                   self.system_state,
+                                                                   self.settings])
         self.activate_remotes()
         if self.settings['save']:
-            self.writer_relay.pub.publish("datastore", "reset", [self.settings, self.mmc.getSystemState().dict()])
+            self.writer_relay.pub.publish("datastore", "reset", [self.settings, self.system_state])
         else:
             self.writer_relay.pub.publish("stop", "stop", [])
         # The viewer process does not have the right to set a window to the foreground
-        ctypes.windll.user32.SetForegroundWindow(self.viewer_id)
+        Timer(0.5, lambda: ctypes.windll.user32.SetForegroundWindow(self.viewer_id)).start()
+
+
 
     def get_shape(self, settings:dict):
         sequence = useq_from_settings(settings)

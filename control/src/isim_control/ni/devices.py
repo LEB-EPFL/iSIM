@@ -226,7 +226,7 @@ class Stage(DAQDevice):
 class LED(DAQDevice):
     def __init__(self):
         self.power = 5
-        self.speed_adjustment = 0.98
+        self.speed_adjustment = 1.002
 
     def one_frame(self, settings: dict, event:useq.MDAEvent, power = None, live=False) -> np.ndarray:
         if live:

@@ -32,7 +32,7 @@ if __name__ == "__main__":
     # sys.addaudithook(open_audit_hook)
 
 
-    os.environ['ZARR_V3_EXPERIMENTAL_API'] = "1"
+    # os.environ['ZARR_V3_EXPERIMENTAL_API'] = "1"
 
     monogram = False
     app = QApplication([])

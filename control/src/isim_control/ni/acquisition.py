@@ -53,6 +53,9 @@ class AcquisitionEngine(MDAEngine):
         except:
             pass
         self.stream.write_many_sample(self.ni_data)
+        # Delay the first frame a little so that things have time to set up
+        if sum(sub_event.index.values()) == 0:
+            time.sleep(1)
 
 
     def exec_event(self, event: MDAEvent):

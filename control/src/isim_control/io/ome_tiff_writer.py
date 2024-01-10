@@ -10,15 +10,16 @@ from threading import Timer
 from typing import TYPE_CHECKING, Any, cast
 from pathlib import Path
 import yaml
-from isim_control.pubsub import Subscriber
-from useq import MDAEvent, MDASequence
+
+from useq import MDAEvent
 from isim_control.io.remote_datastore import RemoteDatastore
 from pymmcore_widgets._mda._datastore import QOMEZarrDatastore
+
 
 if TYPE_CHECKING:
     import numpy as np
     import useq
-from isim_control.settings_translate import useq_from_settings
+
 
 class OMETiffWriter:
     def __init__(self, folder: Path | str, datastore: RemoteDatastore|QOMEZarrDatastore,
@@ -54,6 +55,9 @@ class OMETiffWriter:
             frame = self.datastore.get_frame(idx, shape[0], shape[1])
         elif isinstance(self.datastore, QOMEZarrDatastore):
             frame = self.datastore.get_frame(event)
+        else:
+            frame = self.datastore.get_frame(event)
+
         if event is None:
             return
         elif isinstance(event, dict):
@@ -76,7 +80,6 @@ class OMETiffWriter:
 
         # WRITE DATA TO DISK
         index = tuple(event.index.get(k) for k in self._used_axes)
-        print("FRAME WRITTEN", event.index)
 
         mmap[index] = frame
         mmap.flush()

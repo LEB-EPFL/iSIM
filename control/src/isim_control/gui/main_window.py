@@ -169,6 +169,7 @@ class MainWindow(QMainWindowRestore):
 
     def _mda(self):
         self.mda_window.show()
+        self.mda_window.raise_()
 
     def _live_exposure_change(self, value):
         self.pub.publish("gui", "settings_change", [['live', "exposure"], value])

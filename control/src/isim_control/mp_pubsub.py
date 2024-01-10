@@ -4,16 +4,16 @@ import zarr
 import numpy as np
 import time
 import os
-import ctypes
 from pathlib import Path
 
-from qtpy.QtWidgets import QApplication, QMainWindow
-from qtpy import QtCore
+from qtpy.QtWidgets import QApplication
+
 
 from isim_control.gui.dark_theme import set_dark
 from isim_control.settings_translate import useq_from_settings, load_settings
 from isim_control.io.remote_datastore import RemoteDatastore
 from isim_control.io.ome_tiff_writer import OMETiffWriter
+from isim_control.gui.assets.save_button import SaveButton
 
 from isim_control.pubsub import Subscriber, Publisher, Broker
 
@@ -30,6 +30,7 @@ class Relay(Thread):
         self.pub_queue = multiprocessing.Queue()
         self.out_conn, self.in_conn = multiprocessing.Pipe()
         self.pub = Publisher(self.pub_queue)
+        self.settings = None
         if subscriber:
             self.sub = Subscriber(["control"],
                               {"set_relative_xy_position": [self._set_relative_xy_position],})
@@ -39,9 +40,20 @@ class Relay(Thread):
             self._mmc.mda.events.sequenceStarted.connect(self.sequenceStarted)
             self._mmc.mda.events.sequenceFinished.connect(self.sequenceFinished)
             self._mmc.events.XYStagePositionChanged.connect(self.XYStagePositionChanged)
+            self.system_state = self._mmc.getSystemState().dict()
+
+    def new_settings(self, settings:dict) -> None:
+        self.settings = settings
+        if self._mmc:
+            self.system_state = self._mmc.getSystemState().dict()
 
     def sequenceStarted(self, seq: MDASequence) -> None:
-        self.pub.publish("sequence", "sequence_started", [seq])
+        if self._mmc:
+            self.pub.publish("sequence", "sequence_started", [seq,
+                                                              self.system_state,
+                                                              self.settings])
+        else:
+            self.pub.publish("sequence", "sequence_started", [seq])
 
     def sequenceFinished(self, seq: MDASequence) -> None:
         self.pub.publish("sequence", "sequence_finished", [seq])
@@ -89,7 +101,7 @@ class RemoteZarrWriter(OMEZarrWriter):
     """
     frame_ready = Signal(MDAEvent)
     def __init__(self, datastore: RemoteDatastore, pub_queue=None,
-                 zarr_version=3, *args, **kwargs):
+                 zarr_version=2, *args, **kwargs):
         super().__init__(*args, zarr_version=zarr_version, **kwargs)
         self.sub = Subscriber(["datastore", "sequence"], {"new_frame": [self.frameReady],
                                               "sequence_started": [self.sequence_started],
@@ -98,16 +110,13 @@ class RemoteZarrWriter(OMEZarrWriter):
         self.pub = Publisher(pub_queue) or None
 
     def frameReady(self, event: dict, shape: tuple[int, int], idx: int, meta: dict) -> None:
-        print("FRAME READY IN REMOTE WRITER")
-        t0 = time.perf_counter()
         img = self.datastore.get_frame(idx, shape[0], shape[1])
         super().frameReady(img, MDAEvent(**event), meta)
-        print("FRAME WRITTEN TO REMOTE WRITER", round((time.perf_counter() - t0)*1000))
         # self.frame_ready.emit(MDAEvent(**event))
         if self.pub:
             self.pub.publish("writer", "frame_ready", [event, img.shape, idx, meta])
 
-    def sequence_started(self, seq: MDASequence) -> None:
+    def sequence_started(self, seq: MDASequence, mm_config: dict, settings:dict) -> None:
         self._used_axes = tuple(seq.used_axes)
         super().sequenceStarted(seq)
 
@@ -154,15 +163,18 @@ class RemoteZarrStorage:
 
 class RemoteViewer(StackViewer):
     def __init__(self, size, transform, datastore):
-        super().__init__(size=size, transform=transform, datastore=datastore)
+        super().__init__(size=size, transform=transform, datastore=datastore, save_button=False)
+        self.save_button = SaveButton(datastore)
+        self.bottom_buttons.addWidget(self.save_button)
         self.sub = Subscriber(["writer", "gui"], {"frame_ready": [self.on_frame_ready],
-                                              "acquisition_start": [self.on_sequence_start],
+                                              "acquisition_start": [self.on_sequence_start,
+                                                                    self.save_button.sequenceStarted],
                                               "shutdown": [self.close_me]})
 
     def on_frame_ready(self, event: dict, shape: tuple[int, int], idx: int, meta: dict) -> None:
         return super().frameReady(MDAEvent(**event))
 
-    def on_sequence_start(self, seq: MDASequence) -> None:
+    def on_sequence_start(self, seq: MDASequence, *_) -> None:
         return super().on_sequence_start(seq)
 
     def close_me(self) -> None:
@@ -192,9 +204,7 @@ def viewer_process(viewer_queue, in_pipe, out_pipe, name=None):
     viewer = RemoteViewer(size=(2048, 2048), transform=transform, datastore=datastore)
     viewer.pixel_size = 0.056
     out_pipe.send(int(viewer.winId()))
-    save_button = SaveButton(self.datastore, self.viewer.sequence, self.settings,
-                                    self.mmc.getSystemState().dict())
-    viewer.bottom_buttons.addWidget(self.save_button)
+
     event = in_pipe.recv()
     if event:
         broker = Broker(pub_queue=viewer_queue, auto_start=False, name="viewer_broker")

@@ -2,7 +2,7 @@ from __future__ import annotations
 from pymmcore_plus import CMMCorePlus
 from qtpy.QtWidgets import (QWidget, QGridLayout, QPushButton, QFileDialog, QMainWindow,
                             QVBoxLayout, QHBoxLayout, QCheckBox)
-from qtpy import QtCore, QtGui
+from qtpy import QtCore
 from superqt import fonticon, QRangeSlider
 from useq import MDAEvent
 from fonticon_mdi6 import MDI6
@@ -25,7 +25,6 @@ class iSIMPreview(QWidgetRestore):
         self.rot = settings.get("rot", 90)
         self.mirror_x = settings.get("mirror_x", False)
         self.mirror_y = settings.get("mirror_y", True)
-
         self.preview = Canvas(mmcore=mmcore, rot=self.rot, mirror_x=self.mirror_x,
                               mirror_y=self.mirror_y)
         self._mmc.events.liveFrameReady.connect(self.preview._on_image_snapped)
