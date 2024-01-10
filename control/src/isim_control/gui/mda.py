@@ -16,6 +16,9 @@ class iSIMMDAWidget(QWidgetRestore):
         super().__init__(parent=parent)
         self.mda = MDASequenceWidget()
         self.mda.tab_wdg.removeTab(self.mda.tab_wdg.indexOf(self.mda.stage_positions))
+        self.mda.keep_shutter_open.hide()
+        self.mda.af_axis.hide()
+
         self.mda.grid_plan._fov_height = 114.688
         self.mda.grid_plan._fov_width = 114.688
         self.settings = settings
