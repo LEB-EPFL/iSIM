@@ -168,17 +168,20 @@ class AOTF(DAQDevice):
 
     def one_frame(self, settings: dict, event:useq.MDAEvent, live=False) -> np.ndarray:
         if live:
-            settings['ni']['laser_powers'] = settings['live']['ni']['laser_powers']
+            laser_powers = settings['live']['ni']['laser_powers']
+        else:
+            laser_powers = settings['ni']['laser_powers']
+            # settings['ni']['laser_powers'] = settings['live']['ni']['laser_powers']
         settings = settings['ni']
         n_points = settings['exposure_points']
 
         blank = np.ones(n_points) * self.blank_voltage
         if event.channel.config == '488':
-            aotf_488 = np.ones(n_points) * settings['laser_powers']['488']/10
+            aotf_488 = np.ones(n_points) * laser_powers['488']/10
             aotf_561 = np.zeros(n_points)
         elif event.channel.config == '561':
             aotf_488 = np.zeros(n_points)
-            aotf_561 = np.ones(n_points) * settings['laser_powers']['561']/10
+            aotf_561 = np.ones(n_points) * laser_powers['561']/10
         else:
             aotf_488 = np.zeros(n_points)
             aotf_561 = np.zeros(n_points)
@@ -230,7 +233,9 @@ class LED(DAQDevice):
 
     def one_frame(self, settings: dict, event:useq.MDAEvent, power = None, live=False) -> np.ndarray:
         if live:
-            settings['ni']['laser_powers'] = settings['live']['ni']['laser_powers']
+            power = settings['ni']['laser_powers']['led']
+        else:
+            power = power or settings['ni']['laser_powers']['led']
         settings = settings['ni']
         if event.channel.config.lower() != 'led':
             return np.expand_dims(np.zeros(settings['total_points'] +
@@ -239,7 +244,7 @@ class LED(DAQDevice):
                                  * self.speed_adjustment)
         n_points = (settings['total_points'] -
                     round(self.adjusted_readout * settings['sample_rate']))
-        led = np.ones(n_points) * settings['laser_powers']['led']/10
+        led = np.ones(n_points) * power/10
         led = np.expand_dims(led, 0)
         led = self.add_readout(led, settings)
         return led

@@ -62,7 +62,9 @@ class OutputGUI(QWidget):
         self.settings.set_by_path(keys, value)
         self.viewer_relay.pub.publish("gui", "settings_change", [self.settings])
         # This can take ~1s, so do it here instead of when the sequence starts
-        self.system_state = self.mmc.getSystemState().dict()
+        if not 'live' in keys:
+            print("Update system state in output")
+            self.system_state = self.mmc.getSystemState().dict()
 
     def _on_acquisition_end(self):
         self.close_remote_brokers()

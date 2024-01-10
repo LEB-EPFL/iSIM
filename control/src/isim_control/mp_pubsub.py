@@ -43,9 +43,10 @@ class Relay(Thread):
             self.system_state = self._mmc.getSystemState().dict()
 
     def new_settings(self, settings:dict) -> None:
-        self.settings = settings
-        if self._mmc:
+        if self._mmc and settings['live'] == self.settings['live']:
+            print("UPDATE SYSTEM STATE")
             self.system_state = self._mmc.getSystemState().dict()
+        self.settings = settings
 
     def sequenceStarted(self, seq: MDASequence) -> None:
         if self._mmc:
@@ -125,7 +126,10 @@ class RemoteZarrWriter(OMEZarrWriter):
 
     def get_frame(self, event: MDAEvent) -> np.ndarray:
         key = f'p{event.index.get("p", 0)}'
-        ary = self._arrays[key]
+        try:
+            ary = self._arrays[key]
+        except KeyError:
+            return None
         try:
             index = tuple(event.index.get(k) for k in self._used_axes)
         except AttributeError:
