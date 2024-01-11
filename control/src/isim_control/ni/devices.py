@@ -230,18 +230,27 @@ class LED(DAQDevice):
     def __init__(self):
         self.power = 5
         self.speed_adjustment = 1.002
+        self.low_power_adj = {0: 1, 1: 1, 2: 1, 3: 0.86, 4: 0.95, 5: 0.97, 6: 0.978}
 
-    def one_frame(self, settings: dict, event:useq.MDAEvent, power = None, live=False) -> np.ndarray:
+    def one_frame(self, settings: dict, event:useq.MDAEvent, live=False) -> np.ndarray:
         if live:
-            power = settings['ni']['laser_powers']['led']
+            power = settings['live']['ni']['laser_powers']['led']
         else:
-            power = power or settings['ni']['laser_powers']['led']
+            power = settings['ni']['laser_powers']['led']
+        #Adjust the timing if power is low, otherwise black bars in image
+        if power < 7:
+            speed_adjust = self.low_power_adj[power]
+        elif power < 20:
+            speed_adjust = self.speed_adjustment - ((20 - power) / 800)
+        else:
+            speed_adjust = 1.002
+        print(speed_adjust)
         settings = settings['ni']
         if event.channel.config.lower() != 'led':
             return np.expand_dims(np.zeros(settings['total_points'] +
                                            settings['readout_points']), 0)
         self.adjusted_readout = (settings['readout_points'] / settings['sample_rate']
-                                 * self.speed_adjustment)
+                                 * speed_adjust)
         n_points = (settings['total_points'] -
                     round(self.adjusted_readout * settings['sample_rate']))
         led = np.ones(n_points) * power/10
