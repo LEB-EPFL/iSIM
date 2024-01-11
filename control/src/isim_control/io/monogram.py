@@ -3,7 +3,7 @@ import time
 from psygnal import Signal
 from threading import Thread
 from pymmcore_plus import CMMCorePlus
-from isim_control.pubsub import Publisher
+from isim_control.pubsub import Publisher, Subscriber
 
 CUTOFF_SPEEDUP = 80 # This is 1/ms for last value change
 # CUTOFF_SPEEDDOWN = 5
@@ -21,6 +21,9 @@ class MonogramCC():
         self.thread = Thread(target=self.start_listener, args=(self.device,))
         self.thread.start()
 
+        self.sub = Subscriber(["gui"], {"live_button_clicked": [self.live_button_clicked],})
+        self.live_mode = False
+
     def init_controller(self):
         joystick_count = pygame.joystick.get_count()
         if joystick_count == 0:
@@ -37,8 +40,11 @@ class MonogramCC():
         self.listener.activate_channel_event.connect(self._channel_activate)
         self.listener.start()
 
+    def live_button_clicked(self, value):
+        self.live_mode = value
+
     def _stop_live(self):
-        self.pub.publish("gui", "live_button_clicked", [False])
+        self.pub.publish("gui", "live_button_clicked", [not self.live_mode])
 
     def _laser_intensity(self, laser, value):
         self.pub.publish("gui", "laser_intensity_changed", [laser, value])
