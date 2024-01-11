@@ -71,11 +71,13 @@ class iSIMMDAWidget(QWidgetRestore):
         self.save_settings.set_state(settings)
         self.lasers.power_488.setValue(settings['ni']['laser_powers']['488'])
         self.lasers.power_561.setValue(settings['ni']['laser_powers']['561'])
+        self.lasers.power_led.setValue(settings['ni']['laser_powers']['led'])
 
     def get_settings(self):
         self.settings['acquisition'] = self.mda.value().model_dump()
         self.settings['ni']['laser_powers']['488'] = self.lasers.power_488.value()
         self.settings['ni']['laser_powers']['561'] = self.lasers.power_561.value()
+        self.settings['ni']['laser_powers']['led'] = self.lasers.power_led.value()
         isim_settings = self.isim.get_state()
         for key,value in isim_settings:
             self.settings.set_by_path(key, value)
@@ -149,14 +151,21 @@ class LaserPowers(QWidget):
         self.power_488.setRange(0, 100)
         self.power_488.setValue(settings['ni']['laser_powers']['488'])
         self.power_488.setStyleSheet(slider_theme("#00f7ff"))
+
         self.power_561 = QLabeledSlider(Qt.Orientation.Horizontal)
         self.power_561.setRange(0, 100)
         self.power_561.setValue(settings['ni']['laser_powers']['561'])
         self.power_561.setStyleSheet(slider_theme("#c6ff00"))
 
+        self.power_led = QLabeledSlider(Qt.Orientation.Horizontal)
+        self.power_led.setRange(0, 100)
+        self.power_led.setValue(settings['ni']['laser_powers']['led'])
+        self.power_led.setStyleSheet(slider_theme("#BBBBBB"))
+
         self.setLayout(QVBoxLayout())
         self.layout().addWidget(self.power_488)
         self.layout().addWidget(self.power_561)
+        self.layout().addWidget(self.power_led)
 
 
 class iSIMSettingsWidget(QWidget):
