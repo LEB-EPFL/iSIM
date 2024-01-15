@@ -1,22 +1,23 @@
 from __future__ import annotations
 from pymmcore_plus import CMMCorePlus
 from qtpy.QtWidgets import (QWidget, QGridLayout, QPushButton, QFileDialog, QMainWindow,
-                            QVBoxLayout, QHBoxLayout, QCheckBox)
-from qtpy import QtCore, QtGui
+                            QVBoxLayout, QHBoxLayout, QCheckBox, QSlider, QSizePolicy)
+from qtpy import QtCore
 from superqt import fonticon, QRangeSlider
+from useq import MDAEvent
 from fonticon_mdi6 import MDI6
 from tifffile import imsave
 from pathlib import Path
 import numpy as np
 from vispy import scene, visuals
-from pymmcore_widgets._mda._util._hist import HistPlot
+# from pymmcore_widgets._mda._util._hist import HistPlot
 
 from isim_control.settings_translate import load_settings, save_settings
 from isim_control.gui.assets.qt_classes import QWidgetRestore
 
+
 class iSIMPreview(QWidgetRestore):
-    def __init__(self, parent: QWidget | None = None, mmcore: CMMCorePlus | None = None,
-                 key_listener: QObject | None = None):
+    def __init__(self, parent: QWidget | None = None, mmcore: CMMCorePlus | None = None):
         super().__init__(parent=parent)
         self._mmc = mmcore
         self.current_frame = None
@@ -25,16 +26,17 @@ class iSIMPreview(QWidgetRestore):
         self.rot = settings.get("rot", 90)
         self.mirror_x = settings.get("mirror_x", False)
         self.mirror_y = settings.get("mirror_y", True)
-
         self.preview = Canvas(mmcore=mmcore, rot=self.rot, mirror_x=self.mirror_x,
                               mirror_y=self.mirror_y)
+        self.focus_indicator = FocusIndicator(mmcore=mmcore)
+
         self._mmc.events.liveFrameReady.connect(self.preview._on_image_snapped)
         self._mmc.events.liveFrameReady.connect(self.new_frame)
 
         self.setWindowTitle("Preview")
         self.setLayout(QGridLayout())
-
-        self.layout().addWidget(self.preview, 0, 0, 1, 5)
+        self.layout().addWidget(self.focus_indicator, 0, 0, 1, 1)
+        self.layout().addWidget(self.preview, 0, 1, 1, 5)
 
         self.save_btn = QPushButton("Save")
         self.save_btn.clicked.connect(self.save_image)
@@ -43,13 +45,10 @@ class iSIMPreview(QWidgetRestore):
         self.collapse_btn.setIcon(fonticon.icon(MDI6.arrow_collapse_all))
         self.collapse_btn.clicked.connect(self.collapse_view)
 
-        self.layout().addWidget(self.save_btn, 1, 0)
+        self.layout().addWidget(self.save_btn, 1, 1)
         self.layout().addWidget(self.collapse_btn, 1, 4)
 
         self.installEventFilter(self)
-        if key_listener:
-            self.key_listener = key_listener
-            self.installEventFilter(self.key_listener)
 
     def new_frame(self, image, event, meta):
         if not self.isVisible():
@@ -60,9 +59,9 @@ class iSIMPreview(QWidgetRestore):
     def save_image(self):
         if self.current_frame is not None:
             self.save_loc, _ = QFileDialog.getSaveFileName(directory=self.save_loc)
-            print(self.save_loc)
+            print(self.save_loc[0])
             try:
-                imsave(self.save_loc[0], self.current_frame)
+                imsave(self.save_loc, self.current_frame)
             except Exception as e:
                 import traceback
                 print(traceback.format_exc())
@@ -116,8 +115,8 @@ class Canvas(QWidget):
         self.layout().setContentsMargins(0, 0, 0, 0)
         self.layout().addWidget(self._canvas.native)
 
-        self.histogram = HistPlot()
-        self.layout().addWidget(self.histogram)
+        # self.histogram = HistPlot()
+        # self.layout().addWidget(self.histogram)
 
         self.max_slider = 1
         self.clim_slider = QRangeSlider(QtCore.Qt.Horizontal)
@@ -137,6 +136,7 @@ class Canvas(QWidget):
             return
         self.auto_clim.setChecked(False)
         self._clims[self.last_channel] = (value[0], value[1])
+        self.image.clim = (value[0], value[1])
 
     def update_auto(self, state: int) -> None:
         if state == 2:
@@ -147,7 +147,7 @@ class Canvas(QWidget):
     def _adjust_channel(self, channel: str) -> None:
         if channel == self.last_channel:
             return
-        self.histogram.set_max(self._clims.get(channel, (0, 2))[1])
+        # self.histogram.set_max(self._clims.get(channel, (0, 2))[1])
         block = self.clim_slider.blockSignals(True)
         self.clim_slider.setMaximum(self._clims.get(channel, (0, 2))[1])
         self.clim_slider.blockSignals(block)
@@ -155,7 +155,8 @@ class Canvas(QWidget):
         self.auto_clim.setChecked(self._clim_mode.get(channel, "auto") == "auto")
         self.auto_clim.blockSignals(block)
 
-    def _on_image_snapped(self, img: np.ndarray | None = None, channel: str|None = None) -> None:
+    def _on_image_snapped(self, img: np.ndarray | None = None, event:MDAEvent|None = None) -> None:
+        channel = event.channel.config
         self._adjust_channel(channel)
         if img is None:
             try:
@@ -191,7 +192,26 @@ class Canvas(QWidget):
             block = self.clim_slider.blockSignals(True)
             self.clim_slider.setRange(0, slider_max)
             self.clim_slider.blockSignals(block)
-            self.histogram.set_max(slider_max)
+            # self.histogram.set_max(slider_max)
 
-        self.histogram.update_data(img)
+        # self.histogram.update_data(img)
         self.last_channel = channel
+
+
+class FocusIndicator(QWidget):
+    def __init__(self, mmcore:CMMCorePlus, parent: QWidget | None = None):
+        super().__init__(parent=parent)
+        self.setLayout(QVBoxLayout())
+        self.layout().setContentsMargins(0, 0, 0, 0)
+        self.layout().setSpacing(0)
+        self.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Minimum)
+        self.slider = QSlider()
+        self.slider.setRange(0, 202)
+        self.layout().addWidget(self.slider)
+
+        self._mmc = mmcore
+        self._mmc.events.stagePositionChanged.connect(self.update_position)
+
+    def update_position(self, stage: str, pos: int):
+        print(pos)
+        self.slider.setValue(int(pos))

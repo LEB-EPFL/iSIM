@@ -7,6 +7,7 @@ import time
 from isim_control.ni.devices import NIDeviceGroup
 from useq import MDAEvent
 from threading import Thread, Lock, Event
+import logging
 
 CONTINUOUS = nidaqmx.constants.AcquisitionType.CONTINUOUS
 
@@ -43,12 +44,15 @@ class LiveEngine():
         "STARTING LIVE"
         self.timer = LiveTimer(1/self.fps, self.settings, self.task, self.devices, self._mmc)
         self.timer.start()
+        logging.debug("Live started from LiveEngine")
 
     def _on_sequence_stopped(self):
         if self.timer:
             self.timer.request_cancel()
             if self.timer.running:
+                logging.debug("Live still running, trying again in 0.15s")
                 Timer(0.15, self._on_sequence_stopped).start()
+                return
         self.timer = None
 
     def restart(self):
@@ -103,14 +107,14 @@ class LiveTimer(Timer):
         while not self.finished.wait(self.interval):
             if self.stop_event.is_set() and not self.snap_mode:
                 break
-            #print("live_running")
             thread = Thread(target=self.snap_and_get)
             self.snap_lock.acquire()
             thread.start()
             self.task.write(self.one_frame())
+            logging.debug("NI task written")
             self.snap_lock.acquire()
-            #print(time.perf_counter(), "Send trigger")
             self.task.start()
+            logging.debug("NI task started, trigger sent to camera")
             self.task.wait_until_done()
             self.task.stop()
             if self.stop_event.is_set():
@@ -128,18 +132,15 @@ class LiveTimer(Timer):
 
     def snap_and_get(self):
         self.snap_lock.release()
-        #print(time.perf_counter(), "SNAP")
         try:
             self.snapping.set()
             self._mmc.snapImage()
             self.snapping.clear()
             self._mmc.events.liveFrameReady.emit(self._mmc.getImage(fix=False),
-                                                 self.settings['channel'],
+                                                 MDAEvent(channel=self.settings['channel']),
                                                  self._mmc.getTags())
         except Exception as e:
-            #print(e)
             self.request_cancel()
-        #print(time.perf_counter(), "SNAPPED")
         self.snap_lock.release()
 
     def request_cancel(self):

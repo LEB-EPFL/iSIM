@@ -6,9 +6,15 @@ Should be replaced once this is merged.
 from __future__ import annotations
 
 from datetime import timedelta
+from threading import Timer
 from typing import TYPE_CHECKING, Any, cast
 from pathlib import Path
 import yaml
+
+from useq import MDAEvent
+from isim_control.io.remote_datastore import RemoteDatastore
+from pymmcore_widgets._mda._datastore import QOMEZarrDatastore
+
 
 if TYPE_CHECKING:
     import numpy as np
@@ -16,8 +22,10 @@ if TYPE_CHECKING:
 
 
 class OMETiffWriter:
-    def __init__(self, folder: Path | str, settings:dict | None = None,
-                 mm_config: dict|None = None) -> None:
+    def __init__(self, folder: Path | str, datastore: RemoteDatastore|QOMEZarrDatastore,
+                 settings:dict | None = None,
+                 mm_config: dict|None = None,
+                 subscriber: bool =False) -> None:
         try:
             import tifffile  # noqa: F401
             import yaml
@@ -27,6 +35,8 @@ class OMETiffWriter:
                 "Please `pip install tifffile`. and pyyaml"
             ) from e
 
+        self.datastore = datastore
+
         # create an empty OME-TIFF file
         self._folder = Path(folder)
         self._settings = settings
@@ -35,14 +45,25 @@ class OMETiffWriter:
         self._mmaps: None | np.memmap = None
         self._current_sequence: None | useq.MDASequence = None
         self.n_grid_positions: int = 1
+        self.preparing = False
 
-    def sequenceStarted(self, seq: useq.MDASequence) -> None:
-        self._set_sequence(seq)
+    def frameReady(self, event: dict | MDAEvent | None, shape = None, idx = 0, meta = {}) -> None:
+        if self.preparing:
+            Timer(0.5, self.frameReady, [event, shape, idx, meta]).start()
+            return
+        if isinstance(self.datastore, RemoteDatastore):
+            frame = self.datastore.get_frame(idx, shape[0], shape[1])
+        elif isinstance(self.datastore, QOMEZarrDatastore):
+            frame = self.datastore.get_frame(event)
+        else:
+            frame = self.datastore.get_frame(event)
 
-    def frameReady(self, frame: np.ndarray, event: useq.MDAEvent, meta: dict) -> None:
         if event is None:
             return
+        elif isinstance(event, dict):
+            event = MDAEvent(**event)
         if self._mmaps is None:
+            self.preparing = True
             if not self._current_sequence:
                 # just in case sequenceStarted wasn't called
                 self._set_sequence(event.sequence)  # pragma: no cover
@@ -53,6 +74,7 @@ class OMETiffWriter:
                 )
 
             mmap = self._create_seq_memmap(frame, seq, meta)[event.index.get("g", 0)]
+            self.preparing = False
         else:
             mmap = self._mmaps[event.index.get("g", 0)]
 
@@ -79,7 +101,6 @@ class OMETiffWriter:
         if self._mm_config:
             with open(self._folder/'mm_config.txt', 'w') as outfile:
                 yaml.dump(self._mm_config, outfile, default_flow_style=False)
-
 
     def _create_seq_memmap(
         self, frame: np.ndarray, seq: useq.MDASequence, meta: dict
@@ -138,6 +159,7 @@ class OMETiffWriter:
         return self._mmaps
 
     def __del__(self):
-        for mmap in self._mmaps:
-            mmap.flush()
-            del mmap
+        if self._mmaps:
+            for mmap in self._mmaps:
+                mmap.flush()
+                del mmap

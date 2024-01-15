@@ -1,8 +1,42 @@
 from pymmcore_plus import CMMCorePlus
+from useq import MDAEvent
 import operator, time
 import numpy as np
 import copy
 from qtpy import QtCore, QtGui, QtWidgets
+from threading import Timer
+
+from isim_control.pubsub import Broker, Subscriber
+from isim_control.io.remote_datastore import RemoteDatastore
+from isim_control.io.keyboard import KeyboardListener
+from qtpy.QtWidgets import QApplication
+
+import multiprocessing as mp
+from isim_control.mp_pubsub import Relay
+from isim_control.io.buffered_datastore import BufferedDataStore
+
+def position_history_process(event_queue, control_queue, pipe, name: str):
+    app = QApplication([])
+    broker = Broker(pub_queue=event_queue, auto_start=False, name="history_broker")
+    remote_datastore = RemoteDatastore(name)
+    history = PositionHistory(datastore=remote_datastore)
+    history.sub = Subscriber(["datastore", "sequence", "gui"],
+                             {"new_frame": [history.frame_ready_datastore],
+                              "new_live_frame": [history.frame_ready_datastore],
+                              "xy_stage_position_changed": [history.stage_moved_process],
+                              "shutdown": [history.shutdown]})
+    broker.attach(history)
+    broker.start()
+    key_listener=KeyboardListener(device="MicroDrive XY Stage", pub_queue=control_queue)
+    app.installEventFilter(key_listener)
+    pipe.send(True)
+    history.show()
+    app.exec_()
+    broker.stop()
+    time.sleep(1)
+    print("History process closing")
+    app.exit()
+
 
 class Colors(object):
     """ Defines colors for easy access in all widgets. """
@@ -10,20 +44,24 @@ class Colors(object):
         self.blue = QtGui.QColor(25, 180, 210, alpha=150)
         self.red = QtGui.QColor(220, 20, 60, alpha=150)
 
-
 class PositionHistory(QtWidgets.QGraphicsView):
     """ This is a widget that records the history of where the stage of the microscope has
     been for the given sample. It visualizes the time spent at a specific position on a grid
     with rectangles that get brighter for the more time spent at a position. This is also
     dependent on if the laser light was on at the given time."""
-    xy_stage_position_python = QtCore.Signal(object)
+    xy_stage_position = QtCore.Signal(str, float, float)
     increase_values_signal = QtCore.Signal(object, object, object)
+    close_me = QtCore.Signal()
 
-    def __init__(self, mmcore: CMMCorePlus, key_listener: QtCore.QObject | None = None,
-                 parent:QtWidgets.QWidget=None):
-        super().__init__()
-        self.mmc = mmcore
+    def __init__(self, mmcore: CMMCorePlus|None = None,
+                 datastore: RemoteDatastore|None =  None, parent:QtWidgets.QWidget=None):
+        super().__init__(parent=parent)
+        self.qt_settings = QtCore.QSettings("iSIM", self.__class__.__name__)
+        # Initial window size/pos last saved. Use default values for first time
+        self.resize(self.qt_settings.value("size", QtCore.QSize(270, 225)))
+        self.move(self.qt_settings.value("pos", QtCore.QPoint(50, 50)))
         self.max_img = 0
+        self.datastore = datastore
 
         # Set the properties for the window so that everything is shown and we don't have Scrollbars
         self.view_size = (3000, 3000)
@@ -82,22 +120,29 @@ class PositionHistory(QtWidgets.QGraphicsView):
         self.setDragMode(QtWidgets.QGraphicsView.DragMode.ScrollHandDrag)
 
         # Connect to mmc signals
-        self.mmc.events.XYStagePositionChanged.connect(self.stage_moved)
-        # self.mmc.events.imageSnapped.connect(self.increase_values)
-        self.mmc.mda.events.frameReady.connect(self.frame_ready)
-        self.mmc.events.liveFrameReady.connect(self.frame_ready)
-        self.increase_values_signal.connect(self.increase_values)
+        if mmcore:
+            self.mmc = mmcore
+            self.mmc.events.XYStagePositionChanged.connect(self.stage_moved)
+            # self.mmc.events.imageSnapped.connect(self.increase_values)
+            self.mmc.mda.events.frameReady.connect(self.frame_ready)
+            self.mmc.events.liveFrameReady.connect(self.frame_ready)
+        self.increase_values_signal.connect(self.increase_values)#, QtCore.Qt.QueuedConnection)
+        self.xy_stage_position.connect(self.stage_moved)
+        self.close_me.connect(self.close)
 
-        if key_listener:
-            self.key_listener = key_listener
-            self.installEventFilter(self.key_listener)
-
+        self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
 
     def frame_ready(self, frame, event, metadata):
         self.increase_values_signal.emit(frame, event, metadata)
 
+    def frame_ready_datastore(self, event, shape, idx, meta):
+        frame = self.datastore.get_frame(idx, shape[0], shape[1])
+        self.increase_values_signal.emit(frame, MDAEvent(**event), meta)
+
+    def stage_moved_process(self, name, new_pos0, new_pos1):
+        self.xy_stage_position.emit(name, new_pos0, new_pos1)
+
     def stage_moved(self, name, new_pos0, new_pos1):
-        # print("STAGE MOVED IN HISTORY", new_pos0, new_pos1)
         new_pos = [new_pos0, new_pos1]
         self.stage_pos = new_pos
         new_pos = [x/10 for x in new_pos]
@@ -107,7 +152,6 @@ class PositionHistory(QtWidgets.QGraphicsView):
         self.my_pixmap.setPixmap(QtGui.QPixmap.fromImage(self.map))
         self.now_rect.setPos(QtCore.QPointF(pos[0], pos[1]))
         self.repaint()
-        # self.xy_stage_position_python.emit(self.stage_pos)
 
     def rectangle_pos(self, pos):
         rect_pos = [int(self.sample_size[0]*0.5 + pos[0] - self.fov_size[0]/2),
@@ -240,11 +284,41 @@ class PositionHistory(QtWidgets.QGraphicsView):
     def resizeEvent(self, event):
         self.centerOn(self.now_rect)
 
+    def shutdown(self):
+        # self.hide()
+        self.sub.stop()
+        print("Shutting down PositionHistory")
+        self.close_me.emit()
+        print("PositionHistory close called")
+
+    def closeEvent(self, event):
+        print("CLose event called")
+        self.qt_settings.setValue("size", self.size())
+        self.qt_settings.setValue("pos", self.pos())
+        return super().closeEvent(event)
+
+def main_mp(mmcore:CMMCorePlus, datastore:RemoteDatastore):
+    broker = Broker()
+    relay = Relay(mmcore=mmcore, subscriber=True)
+    process = mp.Process(target=position_history_process,
+                        args=([relay.pub_queue,
+                               broker.pub_queue,
+                               relay.in_conn,
+                                datastore._shm.name]))
+    process.name = "history_process"
+    datastore.pubs.append(relay.pub)
+    process.start()
+    broker.attach(relay)
+    relay.out_conn.recv()
+    return relay, broker, process
+
 if __name__ == "__main__":
     from pymmcore_plus import CMMCorePlus
     from qtpy.QtWidgets import QApplication
     import useq, time
     from qtpy.QtCore import QTimer
+
+    MP = True
 
     mmc = CMMCorePlus()
     mmc.loadSystemConfiguration()
@@ -263,10 +337,19 @@ if __name__ == "__main__":
     # live = LiveButton(mmcore=mmc)
     # live.show()
 
-    from isim_control.gui.position_history import PositionHistory
-    history = PositionHistory(mmc)
-    history.show()
-
+    if not MP:
+        history = PositionHistory(mmc)
+        history.show()
+    else:
+        from isim_control.mp_pubsub import Relay
+        from isim_control.io.buffered_datastore import BufferedDataStore
+        import multiprocessing as mp
+        relay = Relay(mmc)
+        buffered_datastore = BufferedDataStore(mmcore=mmc, create=True, publishers=[relay.pub])
+        process = mp.Process(target=position_history_process,
+                            args=([relay.pub_queue,
+                                   buffered_datastore._shm.name]))
+        process.start()
     # timers = []
     # for i in range(11):
     #     timer = QTimer()
@@ -277,8 +360,10 @@ if __name__ == "__main__":
     #     timer.start(5000 * i)
     #     timers.append(timer)
 
-    time.sleep(1)
-    seq = useq.MDASequence(time_plan={"interval": 0.5, "loops": 100})
+    time.sleep(3)
+    seq = useq.MDASequence(time_plan={"interval": 1/3, "loops": 100})
     mmc.run_mda(seq)
-
     app.exec_()
+
+    if MP:
+        relay.pub.publish("stop", "stop", [])

@@ -1,14 +1,34 @@
-from qtpy import QtCore, QtWidgets
+from qtpy import QtCore, QtWidgets, QtGui
 from pymmcore_plus import CMMCorePlus
+from isim_control.pubsub import Publisher
+import warnings
+
 
 class KeyboardListener(QtCore.QObject):
-    def __init__(self, parent = None, mmc: CMMCorePlus | None = None):
+    def __init__(self, parent = None, mmc: CMMCorePlus | None = None,
+                 device:str = "XY", pub_queue = None):
         super().__init__(parent)
-        self._mmc = mmc or CMMCorePlus()
+        self._mmc = mmc
+        self.pub_queue = pub_queue
+        if mmc:
+            self.device = self._mmc.getXYStageDevice()
+        elif pub_queue:
+            self.pub = Publisher(pub_queue)
+            self.device = device
+        else:
+            warnings.warn("No mmc or publisher provided, no commands will be sent")
+
+    def _set_relative_xy_position(self, device, x, y):
+        if self._mmc:
+            self._mmc.setRelativeXYPosition(device, x, y)
+        elif self.pub_queue:
+            self.pub.publish("control", "set_relative_xy_position", [device, x, y])
+        else:
+            print("KeyboardListener does not have a way to publish commands")
 
     def eventFilter(self, obj, event):
         #Check if it's a key event
-        if not event.type() == 51:
+        if not isinstance(event, QtGui.QKeyEvent):
             return False
         size_adjust = 10
         fov = (114/size_adjust, 114/size_adjust)
@@ -20,16 +40,20 @@ class KeyboardListener(QtCore.QObject):
             move_modifier = 1 * size_adjust
         match event.key():
             case 16777236:
-                self._mmc.setRelativeXYPosition(self._mmc.getXYStageDevice(), fov[0] * move_modifier, 0)
+                if event.type() == 51:
+                    self._set_relative_xy_position(self.device, fov[0] * move_modifier, 0)
                 return True
             case 16777234:
-                self._mmc.setRelativeXYPosition(self._mmc.getXYStageDevice(), - fov[0] * move_modifier, 0)
+                if event.type() == 51:
+                    self._set_relative_xy_position(self.device, - fov[0] * move_modifier, 0)
                 return True
             case 16777235:
-                self._mmc.setRelativeXYPosition(self._mmc.getXYStageDevice(), 0, fov[1] * move_modifier)
+                if event.type() == 51:
+                    self._set_relative_xy_position(self.device, 0, fov[1] * move_modifier)
                 return True
             case 16777237:
-                self._mmc.setRelativeXYPosition(self._mmc.getXYStageDevice(), 0, - fov[1] * move_modifier)
+                if event.type() == 51:
+                    self._set_relative_xy_position(self.device, 0, - fov[1] * move_modifier)
                 return True
         return False
 

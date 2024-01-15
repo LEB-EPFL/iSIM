@@ -16,6 +16,9 @@ class iSIMMDAWidget(QWidgetRestore):
         super().__init__(parent=parent)
         self.mda = MDASequenceWidget()
         self.mda.tab_wdg.removeTab(self.mda.tab_wdg.indexOf(self.mda.stage_positions))
+        self.mda.keep_shutter_open.hide()
+        self.mda.af_axis.hide()
+
         self.mda.grid_plan._fov_height = 114.688
         self.mda.grid_plan._fov_width = 114.688
         self.settings = settings
@@ -23,8 +26,8 @@ class iSIMMDAWidget(QWidgetRestore):
         self.isim = iSIMSettingsWidget()
         self.save_settings = SaverWidget()
         self.save_settings.set_state(settings)
-
         self.pub = publisher
+
         self.setWindowTitle("iSIM MDA")
         self.run_buttons = RunButtons(publisher, self)
         self.setLayout(QVBoxLayout())
@@ -57,6 +60,10 @@ class iSIMMDAWidget(QWidgetRestore):
                 case 'LED':
                     column_info.setCheckState(table, idx, table._get_selector_col(), check_value)
 
+        routes = {"output_ready": [self.run_buttons.activate_run_btn],
+                  "acquisition_finished": [self.save_settings._increase_folder_number]}
+        self.sub = Subscriber(["gui"], routes)
+
     def setValue(self, settings: dict):
         seq = useq_from_settings(settings)
         self.mda.setValue(seq)
@@ -64,11 +71,13 @@ class iSIMMDAWidget(QWidgetRestore):
         self.save_settings.set_state(settings)
         self.lasers.power_488.setValue(settings['ni']['laser_powers']['488'])
         self.lasers.power_561.setValue(settings['ni']['laser_powers']['561'])
+        self.lasers.power_led.setValue(settings['ni']['laser_powers']['led'])
 
     def get_settings(self):
         self.settings['acquisition'] = self.mda.value().model_dump()
         self.settings['ni']['laser_powers']['488'] = self.lasers.power_488.value()
         self.settings['ni']['laser_powers']['561'] = self.lasers.power_561.value()
+        self.settings['ni']['laser_powers']['led'] = self.lasers.power_led.value()
         isim_settings = self.isim.get_state()
         for key,value in isim_settings:
             self.settings.set_by_path(key, value)
@@ -128,7 +137,11 @@ class RunButtons(QWidget):
         self.pause_btn.setIcon(fonticon.icon(MDI6.pause_circle_outline, color="green"))
         self.pause_btn.setText("Pause")
         self.cancel_btn.hide()
+        self.run_btn.setDisabled(True)
         self.pause = False
+
+    def activate_run_btn(self):
+        self.run_btn.setDisabled(False)
 
 
 class LaserPowers(QWidget):
@@ -138,14 +151,21 @@ class LaserPowers(QWidget):
         self.power_488.setRange(0, 100)
         self.power_488.setValue(settings['ni']['laser_powers']['488'])
         self.power_488.setStyleSheet(slider_theme("#00f7ff"))
+
         self.power_561 = QLabeledSlider(Qt.Orientation.Horizontal)
         self.power_561.setRange(0, 100)
         self.power_561.setValue(settings['ni']['laser_powers']['561'])
         self.power_561.setStyleSheet(slider_theme("#c6ff00"))
 
+        self.power_led = QLabeledSlider(Qt.Orientation.Horizontal)
+        self.power_led.setRange(0, 100)
+        self.power_led.setValue(settings['ni']['laser_powers']['led'])
+        self.power_led.setStyleSheet(slider_theme("#BBBBBB"))
+
         self.setLayout(QVBoxLayout())
         self.layout().addWidget(self.power_488)
         self.layout().addWidget(self.power_561)
+        self.layout().addWidget(self.power_led)
 
 
 class iSIMSettingsWidget(QWidget):
@@ -190,8 +210,6 @@ class SaverWidget(QWidget):
         self.layout().addWidget(self.save)
         self.path = QLineEdit("C:/Users/stepp/Desktop/OMETIFF_000")
         self.layout().addWidget(self.path)
-        routes = {"acquisition_finished": [self._increase_folder_number]}
-        self.sub = Subscriber(["gui"], routes)
 
     def _increase_folder_number(self):
         path = self.path.text()

@@ -1,6 +1,7 @@
 from qtpy.QtWidgets import (QPushButton, QWidget, QGridLayout, QGroupBox,
                             QRadioButton, QSpinBox, QLabel, QCheckBox, )
 from qtpy.QtCore import Qt,QObject, QTimer
+from qtpy import QtGui, QtCore
 
 from pymmcore_widgets import GroupPresetTableWidget, StageWidget
 from pymmcore_widgets._device_property_table import DevicePropertyTable
@@ -14,11 +15,10 @@ from isim_control.gui.mda import iSIMMDAWidget
 
 import copy
 from fonticon_mdi6 import MDI6
-
+import logging
 
 class MainWindow(QMainWindowRestore):
-    def __init__(self, publisher:Publisher, settings: dict = {},
-                 key_listener: QObject | None = None):
+    def __init__(self, publisher:Publisher, settings: dict = {}):
         super().__init__()
         self.pub = publisher
         self.settings = settings
@@ -121,9 +121,6 @@ class MainWindow(QMainWindowRestore):
         self.live_power_561.installEventFilter(self)
         self.live_power_led.installEventFilter(self)
 
-        if key_listener:
-            key_listener.installEventFilter(key_listener)
-
     def _on_channel_activated(self, channel:str):
         if channel == "488":
             obj = self.live_power_488
@@ -139,7 +136,6 @@ class MainWindow(QMainWindowRestore):
                 radio.setChecked(True)
             else:
                 slider.setDisabled(True)
-
 
     def _on_laser_intensity_changed(self, channel, value):
         if channel == 1:
@@ -163,6 +159,7 @@ class MainWindow(QMainWindowRestore):
             self.live_button.setText("Live")
             self.live_button.setIcon(fonticon.icon(MDI6.play_circle_outline, color="lime"))
             self.running = False
+        self.live_button.setDisabled(False)
 
     def _device_properties(self):
         if not self.device_prop_table.isVisible():
@@ -172,6 +169,7 @@ class MainWindow(QMainWindowRestore):
 
     def _mda(self):
         self.mda_window.show()
+        self.mda_window.raise_()
 
     def _live_exposure_change(self, value):
         self.pub.publish("gui", "settings_change", [['live', "exposure"], value])
@@ -221,14 +219,12 @@ class MainWindow(QMainWindowRestore):
         self.pub.publish("gui", "settings_change", [['live', "twitchers"], toggle])
 
     def _live(self):
+        self.live_button.setDisabled(True)
         if not self.running:
             self.pub.publish("gui", "live_button_clicked", [True])
-            # self.live_button.setText("Pause")
-            # self.live_button.setIcon(fonticon.icon(MDI6.pause_circle_outline, color="red"))
         else:
             self.pub.publish("gui", "live_button_clicked", [False])
-            # self.live_button.setText("Live")
-            # self.live_button.setIcon(fonticon.icon(MDI6.play_circle_outline, color="lime"))
+        logging.debug(f"Live button clicked{self.running}")
         self.running = not self.running
 
     def _snap(self):
@@ -272,7 +268,6 @@ class MainWindow(QMainWindowRestore):
                                 'channels': mda_widget.tab_wdg.isAxisUsed('c')}
         return settings
 
-
     def eventFilter(self, obj, event):
         # Enable sliders by clicking
         sliders = [self.live_power_488, self.live_power_561, self.live_power_led]
@@ -286,10 +281,11 @@ class MainWindow(QMainWindowRestore):
                     slider.setDisabled(True)
         return super().eventFilter(obj, event)
 
-
+    def keyPressEvent(self, ev):
+        print(ev.key())
 
 class iSIM_StageWidget(QWidgetRestore):
-    def __init__(self, mmc, key_listener: QObject | None = None):
+    def __init__(self, mmc):
         super().__init__()
         self.stage1 = StageWidget("MicroDrive XY Stage", mmcore=mmc)
         self.stage1._step.setValue(25)
@@ -301,6 +297,3 @@ class iSIM_StageWidget(QWidgetRestore):
         self.setLayout(QGridLayout())
         self.layout().addWidget(self.stage1, 2, 0)
         self.layout().addWidget(self.stage2, 2, 1)
-
-        if key_listener:
-            self.installEventFilter(key_listener)
