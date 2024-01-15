@@ -49,6 +49,7 @@ class MonogramCC():
 
     def _stop_live(self):
         self.pub.publish("gui", "live_button_clicked", [not self.live_mode])
+        self.pub.publish("gui", "live_button_clicked", [not self.live_mode])
 
     def _laser_intensity(self, laser, value):
         self.pub.publish("gui", "laser_intensity_changed", [laser, value])
