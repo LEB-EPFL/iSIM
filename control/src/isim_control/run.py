@@ -60,6 +60,7 @@ if __name__ == "__main__":
         mmc.setCameraDevice("PrimeB_Camera")
         mmc.setProperty("PrimeB_Camera", "TriggerMode", "Edge Trigger")
         mmc.setProperty("PrimeB_Camera", "ReadoutRate", "100MHz 16bit")
+
         mmc.setProperty("Sapphire", "State", 1)
         mmc.setProperty("Quantum_561nm", "Laser Operation", "On")
         mmc.setProperty("MCL NanoDrive Z Stage", "Settling time (ms)", 30)
@@ -71,7 +72,7 @@ if __name__ == "__main__":
         from isim_control.ni import live, acquisition, devices
         isim_devices = devices.NIDeviceGroup(settings=settings)
         from isim_control.io.monogram import MonogramCC
-        acq_engine = acquisition.AcquisitionEngine(mmc, isim_devices, settings)
+        acq_engine = acquisition.TimedAcquisitionEngine(mmc, isim_devices, settings)
         live_engine = live.LiveEngine(task=acq_engine.task, mmcore=mmc, settings=settings,
                                         device_group=isim_devices)
         mmc.mda.set_engine(acq_engine)
@@ -127,6 +128,7 @@ if __name__ == "__main__":
     stage.show()
     preview.show()
     frame.show()
+    mmc.setProperty("PrimeB_Camera", "PreampOffLimit",10000)
     app.exec_()
 
     # Clean things up

@@ -35,7 +35,8 @@ class AcquisitionEngine(MDAEngine):
         # handle that in the NI device.
         sub_event = self._adjust_event_properties(event)
         if self.use_filter_wheel:
-            self.mmc.setProperty("FilterWheel", "Label", sub_event.channel.config)
+            set_filter = {"LED": "#NoFilter", "488": "488", "561": "561"}[sub_event.channel.config]
+            self.mmc.setProperty("FilterWheel", "Label", set_filter)
             self.mmc.waitForDevice("FilterWheel")
         super().setup_event(sub_event)
 
@@ -125,6 +126,7 @@ class TimedAcquisitionEngine(AcquisitionEngine):
     def __init__(self, mmc: CMMCorePlus, device_group: NIDeviceGroup = None,
                  settings: dict|None = None):
         super().__init__(mmc, device_group, settings)
+        self.mmc.mda.events.frameReady.connect(self.on_frame)
 
     def on_sequence_end(self, sequence):
         self.show_timing()
@@ -139,8 +141,8 @@ class TimedAcquisitionEngine(AcquisitionEngine):
 
     def show_timing(self):
         frame_times = self.frame_times[self.frame_times != 0]
-        mean_offset = np.mean(np.diff(frame_times))
-        std = np.std(np.diff(frame_times))
+        mean_offset = np.nanmean(np.diff(frame_times))
+        std = np.nanstd(np.diff(frame_times))
         print(round(mean_offset*100)/100, "±", round(std*100)/100, "ms, max",
               max(np.diff(frame_times)), "#", len(frame_times))
         print("Excpected fastest cycle time: ",

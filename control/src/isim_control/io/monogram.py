@@ -38,10 +38,14 @@ class MonogramCC():
         self.listener.stop_live_event.connect(self._stop_live)
         self.listener.laser_intensity_event.connect(self._laser_intensity)
         self.listener.activate_channel_event.connect(self._channel_activate)
+        self.listener.snap_image.connect(self._snap)
         self.listener.start()
 
     def live_button_clicked(self, value):
         self.live_mode = value
+
+    def _snap(self):
+        self.pub.publish("gui", "snap_button_clicked", [True])
 
     def _stop_live(self):
         self.pub.publish("gui", "live_button_clicked", [not self.live_mode])
@@ -61,6 +65,7 @@ class MonogramCC():
         stop_live_event = Signal()
         laser_intensity_event = Signal(int, float)
         activate_channel_event = Signal(str)
+        snap_image = Signal()
         def __init__(self, device, mmcore: CMMCorePlus):
             super().__init__()
             self._device = device
@@ -109,6 +114,8 @@ class MonogramCC():
                             self.activate_channel_event.emit("561")
                         case 5:
                             self.activate_channel_event.emit("led")
+                        case 6:
+                            self.snap_image.emit()
 
 
         def resetPos(self):
