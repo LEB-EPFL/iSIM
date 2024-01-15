@@ -27,6 +27,8 @@ def set_dark(app: QApplication):
     dark_palette.setColor(QPalette.Disabled, QPalette.Light, QColor(53, 53, 53))
     app.setPalette(dark_palette)
 
+from pathlib import Path
+handle_loc = Path(__file__).parent.resolve()/"assets/handle.png"
 
 def slider_theme(groove_color: str = "red"):
     return     """QSlider::groove:horizontal {
@@ -56,7 +58,7 @@ def slider_theme(groove_color: str = "red"):
     }
 
     QSlider::handle:horizontal {
-        border-image: url(control/src/isim_control/gui/assets/handle.png);
+        border-image: url("""+handle_loc.as_posix()+""");
         width: 17px;
         height: 15px;
         margin: -7px 0;

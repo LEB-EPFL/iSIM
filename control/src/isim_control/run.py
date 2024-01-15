@@ -77,6 +77,7 @@ if __name__ == "__main__":
         mmc.mda.set_engine(acq_engine)
 
         monogram = MonogramCC(mmcore=mmc, publisher=Publisher(broker.pub_queue))
+        broker.attach(monogram)
         stage = iSIM_StageWidget(mmc)
     except FileNotFoundError:
         from unittest.mock import MagicMock
