@@ -64,9 +64,9 @@ class iSIMSettings(dict):
         if self['acquisition']['grid_plan']:
             self['acquisition']['grid_plan']['fov_width'] = 114.688
             self['acquisition']['grid_plan']['fov_height'] = 114.688
-            self['acquisition']['grid_plan']['overlap'] = (0.1, 0.1)
-            self['acquisition']['grid_plan']['mode'] = "row_wise_snake"
-            self['acquisition']['grid_plan']['relative_to'] = 'center'
+            # self['acquisition']['grid_plan']['overlap'] = (0.1, 0.1)
+            # self['acquisition']['grid_plan']['mode'] = "row_wise_snake"
+            # self['acquisition']['grid_plan']['relative_to'] = 'center'
 
     def calculate_ni_settings(self, exposure:int = 100):
         self['camera']['exposure'] = (exposure/1000 +

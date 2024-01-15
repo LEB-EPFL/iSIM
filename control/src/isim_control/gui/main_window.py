@@ -251,6 +251,7 @@ class MainWindow(QMainWindowRestore):
         settings['acquisition']['time_plan'] = mda_widget.time_plan.value().model_dump()
         settings['acquisition']['grid_plan'] = mda_widget.grid_plan.value().model_dump()
         settings['acquisition']['z_plan'] = mda_widget.z_plan.value().model_dump()
+
         channels = []
         settings['use_channels'] = {}
         table = mda_widget.channels.table()
