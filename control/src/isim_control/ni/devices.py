@@ -136,22 +136,22 @@ class Twitcher(DAQDevice):
     def __init__(self):
         self.amp = 0.07
         # The sampling rate in the settings should divide nicely with the frequency
-        self.freq = 2400  # Full cycle Hz
+        # self.freq = 2400  # Full cycle Hz
+        self.n_waves = 240
         self.offset = 5
 
     def one_frame(self, settings: dict) -> np.ndarray:
-        #TODO: Think if the twitchers couldn't just run continously
-        # This might be nice, because it might be a second task that runs at a higher frequency
-        # if that's possible
+        # wavelength = 1/self.freq*settings["sample_rate"]  # seconds
+        # n_waves = (settings['exposure_points'])/wavelength
 
-        wavelength = 1/self.freq*settings["sample_rate"]  # seconds
-        n_waves = (settings['exposure_points'])/wavelength
-        points_per_wave = int(np.ceil(settings['exposure_points']/n_waves))
+        points_per_wave = int(np.ceil(settings['exposure_points']/self.n_waves))
+        print(points_per_wave)
         up = np.linspace(-1, 1, points_per_wave//2 + 1)
         down = np.linspace(1, -1, points_per_wave//2 + 1)
         start = np.linspace(0, -1, points_per_wave//4 + 1)
         end = np.linspace(-1, 0, points_per_wave//4 + 1)
-        frame = np.hstack((start[:-1], np.tile(np.hstack((up[:-1], down[:-1])), round(n_waves + 20)), end))
+        frame = np.hstack((start[:-1], np.tile(np.hstack((up[:-1], down[:-1])),
+                                               round(self.n_waves + 20)), end))
         missing_points = settings['total_points'] + settings['readout_points'] - frame.shape[0]
         frame = np.hstack([np.ones(int(np.floor(missing_points/2)))*frame[0],
                            frame,
@@ -244,7 +244,6 @@ class LED(DAQDevice):
             speed_adjust = self.speed_adjustment - ((20 - power) / 800)
         else:
             speed_adjust = 1.002
-        print(speed_adjust)
         settings = settings['ni']
         if event.channel.config.lower() != 'led':
             return np.expand_dims(np.zeros(settings['total_points'] +
