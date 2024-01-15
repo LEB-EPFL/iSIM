@@ -136,22 +136,22 @@ class Twitcher(DAQDevice):
     def __init__(self):
         self.amp = 0.07
         # The sampling rate in the settings should divide nicely with the frequency
-        self.freq = 2400  # Full cycle Hz
+        # self.freq = 2400  # Full cycle Hz
+        self.n_waves = 240
         self.offset = 5
 
     def one_frame(self, settings: dict) -> np.ndarray:
-        #TODO: Think if the twitchers couldn't just run continously
-        # This might be nice, because it might be a second task that runs at a higher frequency
-        # if that's possible
+        # wavelength = 1/self.freq*settings["sample_rate"]  # seconds
+        # n_waves = (settings['exposure_points'])/wavelength
 
-        wavelength = 1/self.freq*settings["sample_rate"]  # seconds
-        n_waves = (settings['exposure_points'])/wavelength
-        points_per_wave = int(np.ceil(settings['exposure_points']/n_waves))
+        points_per_wave = int(np.ceil(settings['exposure_points']/self.n_waves))
+        print(points_per_wave)
         up = np.linspace(-1, 1, points_per_wave//2 + 1)
         down = np.linspace(1, -1, points_per_wave//2 + 1)
         start = np.linspace(0, -1, points_per_wave//4 + 1)
         end = np.linspace(-1, 0, points_per_wave//4 + 1)
-        frame = np.hstack((start[:-1], np.tile(np.hstack((up[:-1], down[:-1])), round(n_waves + 20)), end))
+        frame = np.hstack((start[:-1], np.tile(np.hstack((up[:-1], down[:-1])),
+                                               round(self.n_waves + 20)), end))
         missing_points = settings['total_points'] + settings['readout_points'] - frame.shape[0]
         frame = np.hstack([np.ones(int(np.floor(missing_points/2)))*frame[0],
                            frame,
@@ -168,17 +168,20 @@ class AOTF(DAQDevice):
 
     def one_frame(self, settings: dict, event:useq.MDAEvent, live=False) -> np.ndarray:
         if live:
-            settings['ni']['laser_powers'] = settings['live']['ni']['laser_powers']
+            laser_powers = settings['live']['ni']['laser_powers']
+        else:
+            laser_powers = settings['ni']['laser_powers']
+            # settings['ni']['laser_powers'] = settings['live']['ni']['laser_powers']
         settings = settings['ni']
         n_points = settings['exposure_points']
 
         blank = np.ones(n_points) * self.blank_voltage
         if event.channel.config == '488':
-            aotf_488 = np.ones(n_points) * settings['laser_powers']['488']/10
+            aotf_488 = np.ones(n_points) * laser_powers['488']/10
             aotf_561 = np.zeros(n_points)
         elif event.channel.config == '561':
             aotf_488 = np.zeros(n_points)
-            aotf_561 = np.ones(n_points) * settings['laser_powers']['561']/10
+            aotf_561 = np.ones(n_points) * laser_powers['561']/10
         else:
             aotf_488 = np.zeros(n_points)
             aotf_561 = np.zeros(n_points)
@@ -226,20 +229,30 @@ class Stage(DAQDevice):
 class LED(DAQDevice):
     def __init__(self):
         self.power = 5
-        self.speed_adjustment = 0.98
+        self.speed_adjustment = 1.002
+        self.low_power_adj = {0: 1, 1: 1, 2: 1, 3: 0.86, 4: 0.95, 5: 0.97, 6: 0.978}
 
-    def one_frame(self, settings: dict, event:useq.MDAEvent, power = None, live=False) -> np.ndarray:
+    def one_frame(self, settings: dict, event:useq.MDAEvent, live=False) -> np.ndarray:
         if live:
-            settings['ni']['laser_powers'] = settings['live']['ni']['laser_powers']
+            power = settings['live']['ni']['laser_powers']['led']
+        else:
+            power = settings['ni']['laser_powers']['led']
+        #Adjust the timing if power is low, otherwise black bars in image
+        if power < 7:
+            speed_adjust = self.low_power_adj[power]
+        elif power < 20:
+            speed_adjust = self.speed_adjustment - ((20 - power) / 800)
+        else:
+            speed_adjust = 1.002
         settings = settings['ni']
         if event.channel.config.lower() != 'led':
             return np.expand_dims(np.zeros(settings['total_points'] +
                                            settings['readout_points']), 0)
         self.adjusted_readout = (settings['readout_points'] / settings['sample_rate']
-                                 * self.speed_adjustment)
+                                 * speed_adjust)
         n_points = (settings['total_points'] -
                     round(self.adjusted_readout * settings['sample_rate']))
-        led = np.ones(n_points) * settings['laser_powers']['led']/10
+        led = np.ones(n_points) * power/10
         led = np.expand_dims(led, 0)
         led = self.add_readout(led, settings)
         return led
