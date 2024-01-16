@@ -69,8 +69,9 @@ class AcquisitionEngine(MDAEngine):
         self.snap_lock.release()
         self._mmc.snapImage()
         self.snap_lock.release()
-        self._mmc.mda.events.frameReady.emit(self._mmc.getImage(fix=False), event,
-                                             self._mmc.getTags())
+        meta = self._mmc.getTags()
+        meta["ElapsedTime-ms"] = (meta["PerfCounter"] - self._t0) * 1000
+        self._mmc.mda.events.frameReady.emit(self._mmc.getImage(fix=False), event, meta)
 
     def on_sequence_end(self, sequence):
         self.snap_lock.acquire()
@@ -92,6 +93,7 @@ class AcquisitionEngine(MDAEngine):
         if self.use_filter_wheel:
             self.start_filter = self.mmc.getProperty("FilterWheel", "Label")
         self.start_xy_position = self._mmc.getXYPosition()
+        self._t0 = time.perf_counter()
         self.running.set()
 
     def teardown_sequence(self, sequence):

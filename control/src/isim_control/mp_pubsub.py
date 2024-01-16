@@ -69,20 +69,29 @@ class Relay(Thread):
 class RemoteOMETiffWriter(OMETiffWriter):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, subscriber=False, **kwargs)
-        self.sub = Subscriber(["datastore"], {"reset": [self.reset],
-                                              "new_frame": [self.frameReady],})
+        self.sub = Subscriber(["datastore", "sequence"], {"reset": [self.reset],
+                                              "new_frame": [self.ext_datastore_frame_ready],
+                                              "sequence_finished": [self.sequenceFinished]})
 
     def reset(self, settings, mm_config):
         print("Resetting writer", settings["path"])
         self._folder = Path(settings["path"])
         self._settings = settings
         self._mm_config = mm_config
-        self._set_sequence(useq_from_settings(settings))
+        self.sequenceStarted(useq_from_settings(settings))
 
+    def ext_datastore_frame_ready(self, event: dict | MDAEvent | None, shape = None, idx = 0,
+                                  meta = {}):
+        if isinstance(self.datastore, RemoteDatastore):
+            frame = self.datastore.get_frame(idx, shape[0], shape[1])
+        else:
+            frame = self.datastore.get_frame(event)
+        self.frameReady(frame, event, meta)
 
 def tiff_writer_process(queue, settings, mm_config, in_conn, name):
     datastore = RemoteDatastore(name)
-    writer = RemoteOMETiffWriter(settings["path"], datastore, settings, mm_config)
+    writer = RemoteOMETiffWriter(settings["path"], datastore, settings, mm_config,
+                                 advanced_ome=True)
     print("Writer ready")
     event = in_conn.recv()
     if event:

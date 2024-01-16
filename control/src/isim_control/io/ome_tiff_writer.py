@@ -13,6 +13,7 @@ import yaml
 
 from useq import MDAEvent
 from isim_control.io.remote_datastore import RemoteDatastore
+from isim_control.io.ome_metadata import OME
 from pymmcore_widgets._mda._datastore import QOMEZarrDatastore
 
 
@@ -22,10 +23,11 @@ if TYPE_CHECKING:
 
 
 class OMETiffWriter:
-    def __init__(self, folder: Path | str, datastore: RemoteDatastore|QOMEZarrDatastore,
+    def __init__(self, folder: Path | str, datastore: RemoteDatastore|QOMEZarrDatastore|None = None,
                  settings:dict | None = None,
                  mm_config: dict|None = None,
-                 subscriber: bool =False) -> None:
+                 subscriber: bool = False,
+                 advanced_ome: bool = False) -> None:
         try:
             import tifffile  # noqa: F401
             import yaml
@@ -41,24 +43,39 @@ class OMETiffWriter:
         self._folder = Path(folder)
         self._settings = settings
         self._mm_config = mm_config
+        self.advanced_ome = advanced_ome
 
         self._mmaps: None | np.memmap = None
         self._current_sequence: None | useq.MDASequence = None
         self.n_grid_positions: int = 1
-        self.frame_times = []
         self.preparing = False
 
-    def frameReady(self, event: dict | MDAEvent | None, shape = None, idx = 0, meta = {}) -> None:
-        if self.preparing:
-            Timer(0.5, self.frameReady, [event, shape, idx, meta]).start()
+    def sequenceStarted(self, seq: useq.MDASequence) -> None:
+        self._set_sequence(seq)
+        if not self.advanced_ome:
             return
-        if isinstance(self.datastore, RemoteDatastore):
-            frame = self.datastore.get_frame(idx, shape[0], shape[1])
-        elif isinstance(self.datastore, QOMEZarrDatastore):
-            frame = self.datastore.get_frame(event)
-        else:
-            frame = self.datastore.get_frame(event)
+        self.ome_metadatas = []
+        for g in range(max(self.n_grid_positions, 1)):
+            ome = OME()
+            ome.init_from_sequence(seq)
+            self.ome_metadatas.append(ome)
 
+    def sequenceFinished(self, seq: useq.MDASequence) -> None:
+        from tifffile import tiffcomment
+        if not self.advanced_ome:
+            return
+        for g, metadata in enumerate(self.ome_metadatas):
+            metadata.finalize_metadata()
+            if self.n_grid_positions > 1:
+                filename = f"{self._folder.parts[-1]}_g{str(g).zfill(2)}.ome.tiff"
+            else:
+                filename = f"{self._folder.parts[-1]}.ome.tiff"
+            tiffcomment(Path(self._folder)/filename, metadata.ome.to_xml().encode())
+
+    def frameReady(self, frame: np.ndarray, event: useq.MDAEvent, meta: dict | None = None) -> None:
+        if self.preparing:
+            Timer(0.5, self.frameReady, [frame, event, meta]).start()
+            return
         if event is None:
             return
         elif isinstance(event, dict):
@@ -84,10 +101,12 @@ class OMETiffWriter:
 
         mmap[index] = frame
         mmap.flush()
-        self.frame_times.append(meta["Time"])
+        if self.advanced_ome:
+            self.ome_metadatas[event.index.get("g", 0)].add_plane_from_image(frame, event, meta)
+
+
 
     # -------------------- private --------------------
-
     def _set_sequence(self, seq: useq.MDASequence | None) -> None:
         """Set the current sequence, and update the used axes."""
         self._folder.mkdir(parents=True, exist_ok=True)
@@ -169,6 +188,7 @@ class OMETiffWriter:
 
 if __name__ == "__main__":
     from pymmcore_plus import CMMCorePlus
+    from pymmcore_plus.mda import mda_listeners_connected
     from useq import MDASequence
     import time
     mmcore = CMMCorePlus()
@@ -176,5 +196,8 @@ if __name__ == "__main__":
     mmcore.setProperty("Camera", "OnCameraCCDXSize", 1024)
     mmcore.setProperty("Camera", "OnCameraCCDYSize", 1024)
 
-    writer = OMETiffWriter("test", RemoteDatastore("test"))
-    mmcore.run_mda(MDASequence(time_plan={"interval": 1, "loops": 10}))
+    writer = OMETiffWriter("C:/Users/stepp/Desktop/test2", advanced_ome=True)
+    with mda_listeners_connected(writer):
+        mmcore.mda.run(MDASequence(time_plan={"interval": 1, "loops": 10},
+                                   channels=[{"config": "488"}],
+                                   grid_plan={"columns": 2, "rows": 2},))

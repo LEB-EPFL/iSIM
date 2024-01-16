@@ -145,7 +145,6 @@ class Twitcher(DAQDevice):
         # n_waves = (settings['exposure_points'])/wavelength
 
         points_per_wave = int(np.ceil(settings['exposure_points']/self.n_waves))
-        print(points_per_wave)
         up = np.linspace(-1, 1, points_per_wave//2 + 1)
         down = np.linspace(1, -1, points_per_wave//2 + 1)
         start = np.linspace(0, -1, points_per_wave//4 + 1)

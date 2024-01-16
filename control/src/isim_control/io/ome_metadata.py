@@ -57,7 +57,7 @@ class OME:
             ifd=len(self.planes),
             plane_count=1,
         )
-        # self.image_size = image.raw_image.shape
+        self.image_size = [meta['Width'], meta['Height']]
         self.max_indices = [
             max(self.max_indices[0], event.index.get("c", 0) + 1),
             max(self.max_indices[1], event.index.get("t", 0) + 1),
@@ -80,6 +80,9 @@ class OME:
         dim_order = [a for a in self.seq.axis_order if a.upper() in "ZCT"] + ["Y","X"]
         dim_order = "".join(dim_order).upper()
         dim_order = dim_order[::-1]
+        for a in ["Z", "C", "T"]:
+            if a not in dim_order:
+                dim_order += a
         pixels = ome_model.Pixels(
             id="Pixels:0",
             dimension_order=dim_order,
@@ -165,7 +168,9 @@ if __name__ == "__main__":
 
     ome = OME()
     ome.init_from_sequence(seq)
+
     ome.image_size = (512, 512)
+
     mmc.mda.events.sequenceStarted.connect(ome.init_from_sequence)
     mmc.mda.events.frameReady.connect(ome.add_plane_from_image)
     mmc.mda.events.sequenceFinished.connect(ome.finalize_metadata)

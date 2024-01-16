@@ -1,7 +1,5 @@
 import copy
 import os
-import time
-import multiprocessing
 from isim_control.gui.dark_theme import set_dark
 from qtpy.QtWidgets import QApplication
 from qtpy.QtCore import Signal
@@ -14,10 +12,8 @@ from isim_control.gui.main_window import iSIM_StageWidget, MainWindow
 from pymmcore_plus import CMMCorePlus
 from pymmcore_widgets import StageWidget, GroupPresetTableWidget
 
-import threading
 import logging
-import sys
-import cProfile
+
 
 def main():
     logger = logging.getLogger(__name__)
@@ -73,7 +69,7 @@ def main():
         from isim_control.ni import live, acquisition, devices
         isim_devices = devices.NIDeviceGroup(settings=settings)
         from isim_control.io.monogram import MonogramCC
-        acq_engine = acquisition.TimedAcquisitionEngine(mmc, isim_devices, settings)
+        acq_engine = acquisition.AcquisitionEngine(mmc, isim_devices, settings)
         live_engine = live.LiveEngine(task=acq_engine.task, mmcore=mmc, settings=settings,
                                         device_group=isim_devices)
         mmc.mda.set_engine(acq_engine)
