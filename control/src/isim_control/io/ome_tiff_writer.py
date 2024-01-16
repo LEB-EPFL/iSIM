@@ -45,6 +45,7 @@ class OMETiffWriter:
         self._mmaps: None | np.memmap = None
         self._current_sequence: None | useq.MDASequence = None
         self.n_grid_positions: int = 1
+        self.frame_times = []
         self.preparing = False
 
     def frameReady(self, event: dict | MDAEvent | None, shape = None, idx = 0, meta = {}) -> None:
@@ -83,6 +84,7 @@ class OMETiffWriter:
 
         mmap[index] = frame
         mmap.flush()
+        self.frame_times.append(meta["Time"])
 
     # -------------------- private --------------------
 
@@ -163,3 +165,16 @@ class OMETiffWriter:
             for mmap in self._mmaps:
                 mmap.flush()
                 del mmap
+
+
+if __name__ == "__main__":
+    from pymmcore_plus import CMMCorePlus
+    from useq import MDASequence
+    import time
+    mmcore = CMMCorePlus()
+    mmcore.loadSystemConfiguration()
+    mmcore.setProperty("Camera", "OnCameraCCDXSize", 1024)
+    mmcore.setProperty("Camera", "OnCameraCCDYSize", 1024)
+
+    writer = OMETiffWriter("test", RemoteDatastore("test"))
+    mmcore.run_mda(MDASequence(time_plan={"interval": 1, "loops": 10}))
