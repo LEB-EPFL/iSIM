@@ -9,3 +9,4 @@ Tests
 isim
 .venv*/
 **/*.egg-info/
+PROFILE*

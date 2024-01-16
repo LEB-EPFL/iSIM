@@ -17,8 +17,9 @@ from pymmcore_widgets import StageWidget, GroupPresetTableWidget
 import threading
 import logging
 import sys
+import cProfile
 
-if __name__ == "__main__":
+def main():
     logger = logging.getLogger(__name__)
     ch = logging.StreamHandler()
     ch.setLevel(logging.DEBUG)
@@ -154,3 +155,6 @@ if __name__ == "__main__":
     # There are active QueueFeederThreads that are spawned by the multiprocessing.Queues,
     # But those are al daemons, so they should be cleaned up when the main thread exits
     os._exit(os.EX_OK)
+
+if __name__ == "__main__":
+    main()
