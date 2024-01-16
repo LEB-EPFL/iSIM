@@ -111,10 +111,10 @@ class LiveTimer(Timer):
             self.snap_lock.acquire()
             thread.start()
             self.task.write(self.one_frame())
-            logging.debug("NI task written")
+            # logging.debug("NI task written")
             self.snap_lock.acquire()
             self.task.start()
-            logging.debug("NI task started, trigger sent to camera")
+            # logging.debug("NI task started, trigger sent to camera")
             self.task.wait_until_done()
             self.task.stop()
             if self.stop_event.is_set():

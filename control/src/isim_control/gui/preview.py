@@ -10,7 +10,7 @@ from tifffile import imsave
 from pathlib import Path
 import numpy as np
 from vispy import scene, visuals
-# from pymmcore_widgets._mda._util._hist import HistPlot
+from isim_control.gui.assets._hist import HistPlot
 
 from isim_control.settings_translate import load_settings, save_settings
 from isim_control.gui.assets.qt_classes import QWidgetRestore
@@ -115,8 +115,8 @@ class Canvas(QWidget):
         self.layout().setContentsMargins(0, 0, 0, 0)
         self.layout().addWidget(self._canvas.native)
 
-        # self.histogram = HistPlot()
-        # self.layout().addWidget(self.histogram)
+        self.histogram = HistPlot(self._mmc)
+        self.layout().addWidget(self.histogram)
 
         self.max_slider = 1
         self.clim_slider = QRangeSlider(QtCore.Qt.Horizontal)

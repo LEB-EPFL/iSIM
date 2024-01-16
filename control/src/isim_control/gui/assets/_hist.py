@@ -4,13 +4,14 @@ from qtpy.QtWidgets import QWidget, QLabel, QPushButton, QVBoxLayout
 from qtpy.QtCore import Qt, QPointF, QObject, Signal
 from qtpy.QtGui import QPainter, QBrush, QPixmap
 import numpy as np
-import time
+from pymmcore_plus import CMMCorePlus
 
 
 class HistPlot(QLabel):
     update_data_event = Signal(np.ndarray)
-    def __init__(self, parent: QWidget|None = None):
+    def __init__(self, mmcore: CMMCorePlus|None = None, parent: QWidget|None = None):
         super().__init__(parent)
+        self.mmcore = mmcore
 
         self.hist = np.zeros(100)
         self.pixmap = QPixmap(self.size())
@@ -20,13 +21,15 @@ class HistPlot(QLabel):
         self.hist_calculator.complete.connect(self.new_data)
 
         self.setMaximumHeight(100)
+        if self.mmcore:
+            self.mmcore.events.liveFrameReady.connect(self.hist_calculator.calc_hist)
 
     def update_data(self, img: np.ndarray) -> None:
         self.update_data_event.emit(img)
 
     class HistCalculator(QObject):
         complete = Signal(np.ndarray)
-        def calc_hist(self, img: np.ndarray):
+        def calc_hist(self, img: np.ndarray, *_):
             hist = np.bincount(img.ravel(), minlength=2**16)
             hist = hist[::100]
             hist = np.log10(hist, out=np.zeros_like(hist, dtype=np.float64), where=(hist!=0))
