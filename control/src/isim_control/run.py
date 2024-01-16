@@ -111,6 +111,7 @@ def main():
 
     group_presets = GroupPresetTableWidget(mmcore=mmc)
     frame.main.layout().addWidget(group_presets, 5, 0, 1, 3)
+    frame.group_presets = group_presets
     group_presets.show() # needed to keep events alive?
 
     from isim_control.gui.output import OutputGUI

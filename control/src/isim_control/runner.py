@@ -33,7 +33,7 @@ class iSIMRunner:
         self.devices = devices
 
         self.mmc.mda.events.sequenceFinished.connect(self._on_acquisition_finished)
-        self.mmc.events.propertyChanged.connect(self._restart_live)
+        self.mmc.events.propertyChanged.connect(self._property_changed)
 
     def _on_acquisition_finished(self):
         self.pub.publish("gui", "acquisition_finished")
@@ -82,6 +82,13 @@ class iSIMRunner:
         self.live_engine.update_settings(self.settings)
         self.live_engine.snap()
 
+    def _property_changed(self, device, prop, value):
+        if device != "DStateDevice":
+            self._restart_live(device, prop)
+            return
+        if prop == "Label":
+            self.pub.publish("gui", "channel_activated", [value.lower()])
+
     def _restart_live(self, device, *_):
         """Once a second restart live if property has changed"""
         #TODO: should this go into LiveEngine?
@@ -107,6 +114,10 @@ class iSIMRunner:
                 Timer(0.5, self.live_engine._on_sequence_started).start()
         self.live_engine.update_settings(self.settings)
         self.acquisition_engine.update_settings(self.settings)
+
+        # if keys == ['live', 'channel']:
+        #     self.mmc.setProperty("DStateDevice", "Label", value.upper())
+
 
     def stop(self):
         self.sub.stop()

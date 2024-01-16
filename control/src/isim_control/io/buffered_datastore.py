@@ -10,7 +10,7 @@ from useq import MDAEvent
 import copy
 import time
 
-CAPACITY = int(30E9)
+CAPACITY = int(5E9)
 
 class BufferedDataStore(BufferedArray):
     def __new__(self, *args, **kwargs):

@@ -116,6 +116,8 @@ class MainWindow(QMainWindowRestore):
 
         self.mda_button.pressed.connect(self._mda)
 
+        self.group_presets = None
+
         self.live_led.setChecked(True)
         self.live_power_488.installEventFilter(self)
         self.live_power_561.installEventFilter(self)
@@ -180,7 +182,13 @@ class MainWindow(QMainWindowRestore):
             self.live_power_488.setDisabled(False)
         else:
             self.live_power_488.setDisabled(True)
-        self.pub.publish("gui", "settings_change", [['live', "channel"], self.settings['live']['channel']])
+        self.pub.publish("gui", "settings_change", [['live', "channel"],
+                                                    self.settings['live']['channel']])
+        if self.group_presets and toggle:
+            row = self.group_presets.table_wdg.findItems("Channel",
+                                                         QtCore.Qt.MatchFlag.MatchExactly)[0].row()
+            self.group_presets.table_wdg.cellWidget(row,1)._on_core_change("DStateDevice",
+                                                                           "Label", "488")
 
     def _488_value_changed(self, value):
         self.settings['live']['ni']['laser_powers']['488'] = value
@@ -192,7 +200,13 @@ class MainWindow(QMainWindowRestore):
             self.live_power_561.setDisabled(False)
         else:
             self.live_power_561.setDisabled(True)
-        self.pub.publish("gui", "settings_change", [['live', "channel"], self.settings['live']['channel']])
+        self.pub.publish("gui", "settings_change", [['live', "channel"],
+                                                    self.settings['live']['channel']])
+        if self.group_presets and toggle:
+            row = self.group_presets.table_wdg.findItems("Channel",
+                                                         QtCore.Qt.MatchFlag.MatchExactly)[0].row()
+            self.group_presets.table_wdg.cellWidget(row,1)._on_core_change("DStateDevice",
+                                                                           "Label", "561")
 
     def _561_value_changed(self, value):
         self.settings['live']['ni']['laser_powers']['561'] = value
@@ -204,7 +218,13 @@ class MainWindow(QMainWindowRestore):
             self.live_power_led.setDisabled(False)
         else:
             self.live_power_led.setDisabled(True)
-        self.pub.publish("gui", "settings_change", [['live', "channel"], self.settings['live']['channel']])
+        self.pub.publish("gui", "settings_change", [['live', "channel"],
+                                                    self.settings['live']['channel']])
+        if self.group_presets and toggle:
+            row = self.group_presets.table_wdg.findItems("Channel",
+                                                         QtCore.Qt.MatchFlag.MatchExactly)[0].row()
+            self.group_presets.table_wdg.cellWidget(row,1)._on_core_change("DStateDevice",
+                                                                           "Label", "LED")
 
     def _led_value_changed(self, value):
         self.settings['live']['ni']['laser_powers']['led'] = value
@@ -282,8 +302,6 @@ class MainWindow(QMainWindowRestore):
                     slider.setDisabled(True)
         return super().eventFilter(obj, event)
 
-    def keyPressEvent(self, ev):
-        print(ev.key())
 
 class iSIM_StageWidget(QWidgetRestore):
     def __init__(self, mmc):
