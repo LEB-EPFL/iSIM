@@ -79,6 +79,7 @@ class iSIMPreview(QWidgetRestore):
                         "mirror_x": self.mirror_x,
                         "mirror_y": self.mirror_y}
             save_settings(settings, "live_view")
+            super().closeEvent(event)
 
 
 class Canvas(QWidget):
