@@ -2,6 +2,14 @@
 
  iSIM control and analysis software 
 
+# iSIM turn on sequence
+Computer off
+Switch 1 on
+wait(~1min)
+computer on
+wait(login)
+Switch 2 on
+
  ## Contents
 
  - [control](control) - Prototype of the new iSIM control software
