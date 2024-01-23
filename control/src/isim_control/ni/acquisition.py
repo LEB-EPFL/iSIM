@@ -12,7 +12,7 @@ from isim_control.ni.devices import NIDeviceGroup
 from isim_control.settings import iSIMSettings
 
 CONTINUOUS = nidaqmx.constants.AcquisitionType.CONTINUOUS
-
+WAIT_TIME = 2 #Seconds to wait before starting acq
 class AcquisitionEngine(MDAEngine):
     def __init__(self, mmc: CMMCorePlus, device_group: NIDeviceGroup = None,
                  settings: dict|None = None):
@@ -33,6 +33,7 @@ class AcquisitionEngine(MDAEngine):
     def setup_event(self, event: MDAEvent):
         #TODO: If we want a z_offset for the LED channel, this might break it. We would then have
         # handle that in the NI device.
+        t0 = time.perf_counter()
         sub_event = self._adjust_event_properties(event)
         if self.use_filter_wheel:
             set_filter = {"LED": "#NoFilter", "488": "488", "561": "561"}[sub_event.channel.config]
@@ -56,7 +57,10 @@ class AcquisitionEngine(MDAEngine):
         self.stream.write_many_sample(self.ni_data)
         # Delay the first frame a little so that things have time to set up
         if sum(sub_event.index.values()) == 0:
-            time.sleep(1)
+            #Offset the time we needed to set up the acqusition in the runner
+            self.mmc._mda_runner._paused_time +=time.perf_counter() - t0
+            time.sleep(WAIT_TIME)
+            self.mmc._mda_runner._paused_time += WAIT_TIME
 
 
     def exec_event(self, event: MDAEvent):
