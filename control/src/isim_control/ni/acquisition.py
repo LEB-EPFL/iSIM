@@ -112,10 +112,10 @@ class AcquisitionEngine(MDAEngine):
 
     def adjust_camera_exposure(self, exposure):
         self.previous_exposure = self._mmc.getExposure()
-        print("EXPOSURE SET FOR ACQ", self.previous_exposure)
         if self.previous_exposure != exposure:
             self._mmc.setExposure(exposure)
             self._mmc.waitForDevice(self.mmc.getCameraDevice())
+            print("EXPOSURE SET FOR ACQ", exposure)
 
     def _adjust_event_properties(self, event):
         """We want the exposure set in the Channel to be the 'real' exposure,
