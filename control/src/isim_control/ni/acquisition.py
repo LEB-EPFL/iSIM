@@ -39,6 +39,7 @@ class AcquisitionEngine(MDAEngine):
             set_filter = {"LED": "#NoFilter", "488": "488", "561": "561"}[sub_event.channel.config]
             self.mmc.setProperty("FilterWheel", "Label", set_filter)
             self.mmc.waitForDevice("FilterWheel")
+
         super().setup_event(sub_event)
 
         try:

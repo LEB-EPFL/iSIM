@@ -188,7 +188,7 @@ class RemoteViewer(StackViewer):
         return super().frameReady(MDAEvent(**event))
 
     def on_sequence_start(self, seq: MDASequence, *_) -> None:
-        return super().on_sequence_start(seq)
+        return super().sequenceStarted(seq)
 
     def close_me(self) -> None:
         print("VIEWER ASKED TO CLOSE")
