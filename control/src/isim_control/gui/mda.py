@@ -162,10 +162,13 @@ class LaserPowers(QWidget):
         self.power_led.setValue(settings['ni']['laser_powers']['led'])
         self.power_led.setStyleSheet(slider_theme("#BBBBBB"))
 
-        self.setLayout(QVBoxLayout())
-        self.layout().addWidget(self.power_488)
-        self.layout().addWidget(self.power_561)
-        self.layout().addWidget(self.power_led)
+        self.setLayout(QGridLayout())
+        self.layout().addWidget(QLabel("488"), 0, 0)
+        self.layout().addWidget(self.power_488, 0, 1)
+        self.layout().addWidget(QLabel("561"), 1, 0)
+        self.layout().addWidget(self.power_561, 1, 1)
+        self.layout().addWidget(QLabel("LED"), 2, 0)
+        self.layout().addWidget(self.power_led, 2, 1)
 
 
 class iSIMSettingsWidget(QWidget):
