@@ -65,7 +65,8 @@ class iSIMMDAWidget(QWidgetRestore):
         self.sub = Subscriber(["gui"], routes)
 
         # Handle same exposure for all channels
-        self.last_channels = self.mda.channels.value()
+        self.last_exposures = [x['exposure'] for x
+                               in self.mda.channels.table().iterRecords(exclude_unchecked=False)]
         self.mda.channels.valueChanged.connect(self._set_exposures)
 
     def setValue(self, settings: dict):
@@ -91,21 +92,18 @@ class iSIMMDAWidget(QWidgetRestore):
         return self.settings
 
     def _set_exposures(self):
-        channels = list(self.mda.channels.value())
-        new_channels = []
-        new_exp = channels[0].exposure
-        for channel in channels:
-            if channel not in self.last_channels:
-                new_exp = channel.exposure
+        exposures = [x['exposure'] for x
+                     in self.mda.channels.table().iterRecords(exclude_unchecked=False)]
+        new_exp = exposures[0]
+        for exp in exposures:
+            if not exp in self.last_exposures:
+                new_exp = exp
         new_exp = 50 if new_exp < 50 else new_exp
         new_exp = 300 if new_exp > 300 else new_exp
-        for channel in channels:
-            old_channel = channel.model_dump()
-            del old_channel['exposure']
-            new_channels.append(Channel(exposure=new_exp, **old_channel))
-
-        self.last_channels = new_channels
-        self.mda.channels.setValue(new_channels)
+        for row, data in enumerate(self.mda.channels.table().iterRecords(exclude_unchecked=False)):
+            data['exposure'] = new_exp
+            self.mda.channels.table().setRowData(row, data)
+        self.last_exposures = [new_exp for x in range(len(exposures))]
 
 
 class RunButtons(QWidget):
