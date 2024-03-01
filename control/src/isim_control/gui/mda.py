@@ -8,7 +8,7 @@ from superqt import QLabeledSlider, fonticon
 from isim_control.settings_translate import useq_from_settings
 from isim_control.gui.dark_theme import slider_theme
 from isim_control.gui.assets.qt_classes import QWidgetRestore
-
+from useq import Channel
 from fonticon_mdi6 import MDI6
 
 class iSIMMDAWidget(QWidgetRestore):
@@ -64,6 +64,10 @@ class iSIMMDAWidget(QWidgetRestore):
                   "acquisition_finished": [self.save_settings._increase_folder_number]}
         self.sub = Subscriber(["gui"], routes)
 
+        # Handle same exposure for all channels
+        self.last_channels = self.mda.channels.value()
+        self.mda.channels.valueChanged.connect(self._set_exposures)
+
     def setValue(self, settings: dict):
         seq = useq_from_settings(settings)
         self.mda.setValue(seq)
@@ -85,6 +89,23 @@ class iSIMMDAWidget(QWidgetRestore):
         for key,value in save_settings:
             self.settings.set_by_path(key, value)
         return self.settings
+
+    def _set_exposures(self):
+        channels = list(self.mda.channels.value())
+        new_channels = []
+        new_exp = channels[0].exposure
+        for channel in channels:
+            if channel not in self.last_channels:
+                new_exp = channel.exposure
+        new_exp = 50 if new_exp < 50 else new_exp
+        new_exp = 300 if new_exp > 300 else new_exp
+        for channel in channels:
+            old_channel = channel.model_dump()
+            del old_channel['exposure']
+            new_channels.append(Channel(exposure=new_exp, **old_channel))
+
+        self.last_channels = new_channels
+        self.mda.channels.setValue(new_channels)
 
 
 class RunButtons(QWidget):
