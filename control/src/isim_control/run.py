@@ -144,7 +144,7 @@ def main():
     output.shutdown()
     logging.debug("Output GUI closed")
 
-    mmc.setXYPosition(0, 0)
+    # mmc.setXYPosition(0, 0)
     if monogram:
         monogram.stop()
     logging.debug("App closed")

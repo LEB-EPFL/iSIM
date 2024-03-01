@@ -35,7 +35,8 @@ class NIDeviceGroup():
 
     def get_data(self, event: useq.MDAEvent, next_event: useq.MDAEvent|None = None, live=False):
         galvo = self.galvo.one_frame(self.settings['ni'])[:-self.settings['ni']['readout_points']//3]
-        stage = self.stage.one_frame(self.settings['ni'], event, next_event)[:-self.settings['ni']['readout_points']//3]
+        z_relative = True if self.settings['acquisition']['z_plan'].get('top', False) and not live else False
+        stage = self.stage.one_frame(self.settings['ni'], event, next_event, z_relative)[:-self.settings['ni']['readout_points']//3]
         camera = self.camera.one_frame(self.settings['ni'])[:-self.settings['ni']['readout_points']//3]
         aotf = self.aotf.one_frame(self.settings, event, live)[:, :-self.settings['ni']['readout_points']//3]
         led = self.led.one_frame(self.settings, event, live)[:, :-self.settings['ni']['readout_points']//3]
@@ -202,25 +203,29 @@ class Stage(DAQDevice):
         self.max_v = 10
 
     def one_frame(self, settings: dict, event: useq.MDAEvent,
-                  next_event: useq.MDAEvent|None = None) -> np.ndarray:
-        # relative_z = settings['relative_z']
-        # height_offset = relative_z if event.z_pos is None else (event.z_pos + relative_z)
+                  next_event: useq.MDAEvent|None = None, relative: bool = False) -> np.ndarray:
         height_offset = 0 if event.z_pos is None else event.z_pos
+        if relative:
+            height_offset = settings['relative_z'] if event.z_pos is None else (event.z_pos - settings['relative_z'])
         height_offset = self.convert_z(height_offset)
         stage_frame = (np.ones(settings['readout_points'] + settings['exposure_points']) *
                        height_offset)
-        stage_frame = self.add_readout(stage_frame, settings['readout_points'], next_event)
+        stage_frame = self.add_readout(stage_frame, settings, next_event, relative)
         return stage_frame
 
     def convert_z(self, z_um):
         return (z_um/self.calibration) * self.max_v
 
-    def add_readout(self, frame, readout_points, next_event:useq.MDAEvent|None):
+    def add_readout(self, frame, settings, next_event:useq.MDAEvent|None,
+                    relative: bool|float = False):
         if next_event is None or next_event.z_pos is None:
             height_offset = frame[-1]
         else:
-            height_offset = next_event.z_pos
-        readout_delay = np.ones(readout_points)*self.convert_z(height_offset)
+            if relative:
+                height_offset = next_event.z_pos - settings['relative_z']
+            else:
+                height_offset = next_event.z_pos
+        readout_delay = np.ones(settings['readout_points'])*self.convert_z(height_offset)
         frame = np.hstack([frame, readout_delay])
         return frame
 

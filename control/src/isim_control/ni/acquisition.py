@@ -120,7 +120,7 @@ class AcquisitionEngine(MDAEngine):
     def _adjust_event_properties(self, event):
         """We want the exposure set in the Channel to be the 'real' exposure,
            so we set the exposure of the event to None, so that it's not set in the MDAEngine setup
-           The same the z position..."""
+           The same for the z position..."""
         event_dict = event.model_dump()
         event_dict['exposure'] = None
         event_dict['z_pos'] = None
