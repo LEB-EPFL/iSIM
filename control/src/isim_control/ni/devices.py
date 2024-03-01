@@ -35,7 +35,10 @@ class NIDeviceGroup():
 
     def get_data(self, event: useq.MDAEvent, next_event: useq.MDAEvent|None = None, live=False):
         galvo = self.galvo.one_frame(self.settings['ni'])[:-self.settings['ni']['readout_points']//3]
-        z_relative = True if self.settings['acquisition']['z_plan'].get('top', False) and not live else False
+        try:
+            z_relative = True if self.settings['acquisition']['z_plan'].get('top', False) and not live else False
+        except AttributeError:
+            z_relative = False
         stage = self.stage.one_frame(self.settings['ni'], event, next_event, z_relative)[:-self.settings['ni']['readout_points']//3]
         camera = self.camera.one_frame(self.settings['ni'])[:-self.settings['ni']['readout_points']//3]
         aotf = self.aotf.one_frame(self.settings, event, live)[:, :-self.settings['ni']['readout_points']//3]

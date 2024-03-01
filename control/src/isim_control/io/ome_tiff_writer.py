@@ -5,6 +5,7 @@ Should be replaced once this is merged.
 
 from __future__ import annotations
 
+import time
 from datetime import timedelta
 from threading import Timer
 from typing import TYPE_CHECKING, Any, cast
@@ -15,10 +16,10 @@ from useq import MDAEvent
 from isim_control.io.remote_datastore import RemoteDatastore
 from isim_control.io.ome_metadata import OME
 from pymmcore_widgets._mda._datastore import QOMEZarrDatastore
-
+from isim_control.settings_translate import load_settings
+import numpy as np
 
 if TYPE_CHECKING:
-    import numpy as np
     import useq
 
 
@@ -38,7 +39,7 @@ class OMETiffWriter:
             ) from e
 
         self.datastore = datastore
-
+        self._view_settings = load_settings("live_view")
         # create an empty OME-TIFF file
         self._folder = Path(folder)
         self._settings = settings
@@ -98,6 +99,12 @@ class OMETiffWriter:
 
         # WRITE DATA TO DISK
         index = tuple(event.index.get(k) for k in self._used_axes)
+
+
+        rotate = self._view_settings.get("rot", 0)
+        while rotate > 0:
+            frame = np.rot90(frame)
+            rotate -= 90
 
         mmap[index] = frame
         mmap.flush()
