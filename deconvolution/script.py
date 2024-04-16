@@ -98,5 +98,3 @@ os.system(f"git checkout {MY_VERSION}")
 #         tif.write(destripped.astype(np.uint16), metadata=imagej_metadata)
 
 
-os.system("git checkout main")
-os.system("git stash apply")
