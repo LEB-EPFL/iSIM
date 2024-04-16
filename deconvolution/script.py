@@ -5,13 +5,13 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "0"
 
 os.system("C:/Internal/.envs/decon_310/Scripts/activate")
 os.system("cd C:/Internal/deconvolution")
-
+os.system("git checkout 20240416")
 
 from prepare import test_versioning
-
+import time
 
 test_versioning()
-
+time.sleep(3)
 # import tensorflow
 
 # gpus = tensorflow.config.list_physical_devices('GPU')
@@ -94,3 +94,9 @@ test_versioning()
 #     out_file = out_file[0] + ".".join(["_destripped", *out_file[1:]])
 #     with tifffile.TiffWriter(os.path.join(os.path.dirname(file), out_file), imagej=True) as tif:
 #         tif.write(destripped.astype(np.uint16), metadata=imagej_metadata)
+
+
+
+
+
+os.system("git checkout main")
