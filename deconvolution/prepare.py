@@ -77,3 +77,6 @@ def prepare_image(image, background=0.85, median=3, gaussian=1.5):
     prep_img = cv2.medianBlur(prep_img, median)
     prep_img = cv2.GaussianBlur(prep_img, (0, 0), gaussian)
     return prep_img
+
+def test_versioning():
+    print("Version 1")

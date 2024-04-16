@@ -1,50 +1,57 @@
 #!‪C:\Internal\.envs\decon_310\Scripts\python.exe
 
 import os
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "0"
 
 os.system("C:/Internal/.envs/decon_310/Scripts/activate")
 os.system("cd C:/Internal/deconvolution")
-import tensorflow
-
-gpus = tensorflow.config.list_physical_devices('GPU')
-for gpu in gpus:
-    tensorflow.config.experimental.set_memory_growth(gpu, True)
 
 
+from prepare import test_versioning
 
-from pathlib import Path
-from prepare import get_filter_zone_ver_stripes, prepare_one_slice
-import cuda_decon
 
-# Import
-# folder = "Z:/iSIMstorage/Users/Willi/decon_test_Tatjana/"
-# file = r"\\lebnas1\microsc125\iSIMstorage\Users\Willi\decon_test_Tatjana\Cell_1\original.tif"
-# cuda_decon.decon_one_frame(file, {'background': 'median'})
-# folder = r"\\lebnas1.epfl.ch\microsc125\iSIMstorage\Users\Tatjana\2022\220302_MEFwt_MitotrG_S5"
-# folder = r"Z:\iSIMstorage\Users\Tatjana\2022\2207\220713"
-folder = r"W:\iSIMstorage\Users\Willi\20230201_u2os_presets"
-# folder = r"Z:/iSIMstorage/Users/Juan/230202_EDA-TrainingData/230202_U2OS_mtSG-TfamRFP_10"
-# folder = r"Y:\_Lab members\Christian_Z\cryo_CEMExM\data\230202_NHS_Christian"  # \230202_NHS_2N__3"
+test_versioning()
 
-# folder = r"W:\iSIMstorage\Users\Juan\230503_MEF_Opa1\Data"
+# import tensorflow
 
-files = Path(folder).rglob('*.ome.tif')
+# gpus = tensorflow.config.list_physical_devices('GPU')
+# for gpu in gpus:
+#     tensorflow.config.experimental.set_memory_growth(gpu, True)
 
-print(files)
 
-parameters = {
-    'background': "median",
-}
-# background      0-3: otsu with this scaling factor
-# background      > 3: fixed value
-# background 'median': median of each z-stack as bg
 
-for file in files:
-    if not 'decon' in file.name:
-        print(file.name)
-        print(file.as_posix())
-        cuda_decon.decon_ome_stack(file.as_posix(), params=parameters)
+# from pathlib import Path
+# from prepare import get_filter_zone_ver_stripes, prepare_one_slice
+# import cuda_decon
+
+# # Import
+# # folder = "Z:/iSIMstorage/Users/Willi/decon_test_Tatjana/"
+# # file = r"\\lebnas1\microsc125\iSIMstorage\Users\Willi\decon_test_Tatjana\Cell_1\original.tif"
+# # cuda_decon.decon_one_frame(file, {'background': 'median'})
+# # folder = r"\\lebnas1.epfl.ch\microsc125\iSIMstorage\Users\Tatjana\2022\220302_MEFwt_MitotrG_S5"
+# # folder = r"Z:\iSIMstorage\Users\Tatjana\2022\2207\220713"
+# folder = r"W:\iSIMstorage\Users\Willi\20230201_u2os_presets"
+# # folder = r"Z:/iSIMstorage/Users/Juan/230202_EDA-TrainingData/230202_U2OS_mtSG-TfamRFP_10"
+# # folder = r"Y:\_Lab members\Christian_Z\cryo_CEMExM\data\230202_NHS_Christian"  # \230202_NHS_2N__3"
+
+# # folder = r"W:\iSIMstorage\Users\Juan\230503_MEF_Opa1\Data"
+
+# files = Path(folder).rglob('*.ome.tif')
+
+# print(files)
+
+# parameters = {
+#     'background': "median",
+# }
+# # background      0-3: otsu with this scaling factor
+# # background      > 3: fixed value
+# # background 'median': median of each z-stack as bg
+
+# for file in files:
+#     if not 'decon' in file.name:
+#         print(file.name)
+#         print(file.as_posix())
+#         cuda_decon.decon_ome_stack(file.as_posix(), params=parameters)
 
 
 # files = [r'Z:\iSIMstorage\Users\Juan\DOX CP tests\Day2\Processed\Control_2_MMStack_Pos0.ome.tif']
