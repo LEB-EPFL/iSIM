@@ -10,3 +10,5 @@ isim
 .venv*/
 **/*.egg-info/
 PROFILE*
+
+script_

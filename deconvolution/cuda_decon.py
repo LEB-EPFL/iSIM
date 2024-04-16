@@ -18,8 +18,8 @@ from typing import Union
 import json
 
 import uuid
-import time
-import os
+import time  
+import os  
 import pdb
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 # os.environ["XLA_PYTHON_CLIENT_ALLOCATOR"] = 'platform'
@@ -124,7 +124,7 @@ def init_algo(image):
     return fd_restoration.RichardsonLucyDeconvolver(image.ndim).initialize()
 
 
-def decon_ome_stack(file_dir, params=None):
+def decon_ome_stack(file_dir, params=None, size_limit=SIZE_LIMIT):
     with tifffile.TiffFile(file_dir) as tif:
         imagej_metadata = tif.imagej_metadata
         my_dict = xmltodict.parse(tif.ome_metadata, force_list={'Plane'})
@@ -133,13 +133,19 @@ def decon_ome_stack(file_dir, params=None):
         size_c = int(my_dict['OME']['Image']["Pixels"]["@SizeC"])
         try:
             z_step = float(my_dict['OME']['Image']["Pixels"]['@PhysicalSizeZ'])
+            print("Found z step:", z_step)
         except KeyError:
             print("Could not get z step size. Will put default 0.2")
             z_step = 0.2
         # 'XYCZT' or 'XYZCT' ?
         dim_order = my_dict['OME']['Image']["Pixels"]["@DimensionOrder"]
         data = tif.asarray()
-        # print(size_t, size_z, size_c)
+        #correct for unsaved last frames
+        if np.prod(data.shape[:-2]) != size_c*size_t*size_z:
+            data = data[:-1]
+            data = data.reshape((data.shape[0]//size_c, size_c, *data.shape[-2:]))
+            size_t = data.shape[0]
+        print(size_t, size_z, size_c)
         # print(dim_order)
 
     ndim = 2 if size_z == 1 else 3
@@ -167,6 +173,7 @@ def decon_ome_stack(file_dir, params=None):
         pad_here = tuple(np.zeros((5,2), int))
         pad_here[1][1] = 1
         data = np.pad(data, pad)
+    print(data.shape)
     for dim in [3, 4]:
         if data.shape[dim]%2 == 0:
             pad[dim][1] = 1
@@ -181,8 +188,8 @@ def decon_ome_stack(file_dir, params=None):
     if ndim == 3:
         n_pixels = np.prod(data[0, : ,0, :, :].shape)
         print(n_pixels)
-        if n_pixels > SIZE_LIMIT:
-            n_stacks = np.ceil(n_pixels/SIZE_LIMIT)
+        if n_pixels > size_limit:
+            n_stacks = np.ceil(n_pixels/size_limit)
             print("n_stacks ", n_stacks)
             n_slices = round(size_z/n_stacks)
             n_slices = n_slices - 1 if n_slices%2 == 0 else n_slices
@@ -255,6 +262,8 @@ def decon_ome_stack(file_dir, params=None):
     # Output
 
     #Adjust metadata
+    if imagej_metadata == None:
+        imagej_metadata = {}
     try:
         imagej_metadata['min'] = np.min(decon)
         imagej_metadata['max'] = np.max(decon)
@@ -278,19 +287,26 @@ def decon_ome_stack(file_dir, params=None):
         mdInfo = xmltodict.parse(reader.ome_metadata)
         mdInfo['OME']['Image']["Pixels"]["@DimensionOrder"] = "XYCZT"
         mdInfo['OME']['Image']['@Name'] = os.path.basename(out_file).split('.')[0]
-        frames_tiffdata = mdInfo['OME']['Image']['Pixels']['TiffData']
-        if isinstance(frames_tiffdata, list):
+        if isinstance(mdInfo['OME']['Image']['Pixels']['TiffData'], list):
+            frames_tiffdata = mdInfo['OME']['Image']['Pixels']['TiffData'][:size_t*size_z*size_c]
             for frame_tiffdata in frames_tiffdata:
-                frame_tiffdata['UUID']['@FileName'] = os.path.basename(out_file)
+                try:
+                    frame_tiffdata['UUID']['@FileName'] = os.path.basename(out_file)
+                except KeyError:
+                    frame_tiffdata['UUID'] = {}
+                    frame_tiffdata['UUID']['@FileName'] = os.path.basename(out_file)
                 frame_tiffdata['UUID']['#text'] =  'urn:uuid:' + str(UUID)
         else:
-            frame_tiffdata = frames_tiffdata
-            frame_tiffdata['UUID']['@FileName'] = os.path.basename(out_file)
-            frame_tiffdata['UUID']['#text'] =  'urn:uuid:' + str(UUID)
+            frames_tiffdata = mdInfo['OME']['Image']['Pixels']['TiffData']
+            frames_tiffdata['UUID'] = {}
+            frames_tiffdata['UUID']['@FileName'] = os.path.basename(out_file)
+            frames_tiffdata['UUID']['#text'] =  'urn:uuid:' + str(UUID)
 
     with tifffile.TiffWriter(os.path.join(os.path.dirname(file_dir), out_file), bigtiff=True, ome=True) as tif:
         tif.write(decon, photometric='minisblack', compression='None')
 
+    mdInfo['OME']['Image']['Pixels']['TiffData'] = frames_tiffdata
+    mdInfo['OME']['Image']['Pixels']['@SizeT'] = str(size_t)
     # Write metadata to the prepared file
     my_mdInfo = xmltodict.unparse(mdInfo).encode(encoding='UTF-8', errors='strict')
     tifffile.tiffcomment(os.path.join(os.path.dirname(file_dir), out_file), comment=my_mdInfo)
@@ -319,6 +335,7 @@ def decon_one_frame(file_dir, params=None):
 
     out_file = os.path.basename(file_dir).rsplit('.', 2)
     out_file = out_file[0] + ".".join(["_decon", *out_file[1:]])
+    # out_file = "D:/Users/stepp/Desktop/test_decon.ome.tif"
 
     tifffile.imwrite(os.path.join(os.path.dirname(file_dir), out_file), decon)
 

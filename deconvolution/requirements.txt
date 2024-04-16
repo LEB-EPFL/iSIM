@@ -1,8 +1,8 @@
-flowdec
-matplotlib
-opencv-python
-scikit-image
 tensorflow==2.10
-tifffile
+scikit-image
+matplotlib
 tqdm
+tifffile
 xmltodict
+opencv-python
+flowdec
