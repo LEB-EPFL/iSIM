@@ -79,4 +79,4 @@ def prepare_image(image, background=0.85, median=3, gaussian=1.5):
     return prep_img
 
 def test_versioning():
-    print("Version 2")
+    print("Version 3")

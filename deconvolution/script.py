@@ -8,6 +8,7 @@ my_version = "20240416_2"
 os.system("C:/Internal/.envs/decon_310/Scripts/activate")
 os.system("cd C:/Internal/deconvolution")
 my_version = "main" if my_version == "latest" else my_version
+os.system(f"git stash push")
 os.system(f"git checkout {my_version}")
 
 from prepare import test_versioning
@@ -103,3 +104,4 @@ time.sleep(3)
 
 
 os.system("git checkout main")
+os.system("git stash apply")
