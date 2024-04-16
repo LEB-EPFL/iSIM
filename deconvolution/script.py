@@ -1,21 +1,19 @@
 #!‪C:\Internal\.envs\decon_310\Scripts\python.exe
-
 import os
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "0"
+import sys
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
-my_version = "20240416_2"
+venv_dir = "C:/Internal/.envs/decon_310"
+os.environ['VIRTUAL_ENV'] = venv_dir  # optional: to include the VIRTUAL_ENV variable
+sys.path.append(os.path.join(venv_dir, 'lib', 'site-packages'))
 
-os.system("C:/Internal/.envs/decon_310/Scripts/activate")
-os.system("cd C:/Internal/deconvolution")
-my_version = "main" if my_version == "latest" else my_version
+
+MY_VERSION = "20240416_2"
+MY_VERSION = "main" if MY_VERSION == "latest" else MY_VERSION
 os.system(f"git stash push")
-os.system(f"git checkout {my_version}")
+os.system(f"git checkout {MY_VERSION}")
 
-from prepare import test_versioning
-import time
 
-test_versioning()
-time.sleep(3)
 # import tensorflow
 
 # gpus = tensorflow.config.list_physical_devices('GPU')
@@ -98,9 +96,6 @@ time.sleep(3)
 #     out_file = out_file[0] + ".".join(["_destripped", *out_file[1:]])
 #     with tifffile.TiffWriter(os.path.join(os.path.dirname(file), out_file), imagej=True) as tif:
 #         tif.write(destripped.astype(np.uint16), metadata=imagej_metadata)
-
-
-
 
 
 os.system("git checkout main")
