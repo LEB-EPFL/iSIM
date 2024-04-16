@@ -1,7 +1,7 @@
 import os
 import sys
 
-def set_venv_and_version(venv: str = None, version: str = "latest"):
+def set_version_and_venv(version: str = "latest", venv: str|None = None):
     if venv is None:
         venv = "C:/Internal/.envs/decon_310"
     os.environ['VIRTUAL_ENV'] = venv  # optional: to include the VIRTUAL_ENV variable
