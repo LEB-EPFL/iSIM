@@ -3,9 +3,12 @@
 import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "0"
 
+my_version = "20240416_2"
+
 os.system("C:/Internal/.envs/decon_310/Scripts/activate")
 os.system("cd C:/Internal/deconvolution")
-os.system("git checkout 20240416")
+my_version = "main" if my_version == "latest" else my_version
+os.system(f"git checkout {my_version}")
 
 from prepare import test_versioning
 import time
