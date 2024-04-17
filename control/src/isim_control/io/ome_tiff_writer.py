@@ -62,9 +62,10 @@ class OMETiffWriter:
             ome.init_from_sequence(seq)
             self.ome_metadatas.append(ome)
 
-    def sequenceFinished(self, seq: useq.MDASequence) -> None:
-        if self.writing_frame:
-            Timer(0.5, self.sequenceFinished, [seq]).start()
+    def sequenceFinished(self, seq: useq.MDASequence, delay:bool = True) -> None:
+        if self.writing_frame or delay:
+            # log.debug("Delaying sequence finished to wait for last frame")
+            Timer(1, self.sequenceFinished, [seq, False]).start()
             return
         from tifffile import tiffcomment
         if not self.advanced_ome:
