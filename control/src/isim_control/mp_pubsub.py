@@ -103,11 +103,6 @@ def tiff_writer_process(queue, settings, mm_config, in_conn, name):
         writer.sub.stop()
         del writer
 
-    while writer._current_sequence is not None:
-        print("Waiting for writer")
-        time.sleep(1)
-    print("------ Writer process closing ------")
-
 
 class RemoteZarrWriter(OMEZarrWriter):
     """OMEZarrWriter that runs in a separate process. Communication therefore has to be in basic
