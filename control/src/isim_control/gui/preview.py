@@ -59,7 +59,9 @@ class iSIMPreview(QWidgetRestore):
     def save_image(self):
         if self.current_frame is not None:
             self.save_loc, _ = QFileDialog.getSaveFileName(directory=self.save_loc)
-            print(self.save_loc[0])
+            print(self.save_loc)
+            if self.save_loc[-4:] not in [".tif", "tiff"]:
+                self.save_loc += ".tif"
             try:
                 imsave(self.save_loc, self.current_frame)
             except Exception as e:

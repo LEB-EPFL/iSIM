@@ -102,7 +102,11 @@ def tiff_writer_process(queue, settings, mm_config, in_conn, name):
         del datastore
         writer.sub.stop()
         del writer
-        print("Writer process closing")
+
+    while writer._current_sequence is not None:
+        print("Waiting for writer")
+        time.sleep(1)
+    print("------ Writer process closing ------")
 
 
 class RemoteZarrWriter(OMEZarrWriter):

@@ -50,6 +50,7 @@ class OMETiffWriter:
         self._current_sequence: None | useq.MDASequence = None
         self.n_grid_positions: int = 1
         self.preparing = False
+        self.writing_frame = False
 
     def sequenceStarted(self, seq: useq.MDASequence) -> None:
         self._set_sequence(seq)
@@ -62,6 +63,9 @@ class OMETiffWriter:
             self.ome_metadatas.append(ome)
 
     def sequenceFinished(self, seq: useq.MDASequence) -> None:
+        if self.writing_frame:
+            Timer(0.5, self.sequenceFinished, [seq]).start()
+            return
         from tifffile import tiffcomment
         if not self.advanced_ome:
             return
@@ -72,8 +76,10 @@ class OMETiffWriter:
             else:
                 filename = f"{self._folder.parts[-1]}.ome.tiff"
             tiffcomment(Path(self._folder)/filename, metadata.ome.to_xml().encode())
+        self._current_sequence = None
 
     def frameReady(self, frame: np.ndarray, event: useq.MDAEvent, meta: dict | None = None) -> None:
+        self.writing_frame = True
         if self.preparing:
             Timer(0.5, self.frameReady, [frame, event, meta]).start()
             return
@@ -100,7 +106,6 @@ class OMETiffWriter:
         # WRITE DATA TO DISK
         index = tuple(event.index.get(k) for k in self._used_axes)
 
-
         rotate = self._view_settings.get("rot", 0)
         while rotate > 0:
             frame = np.rot90(frame)
@@ -109,9 +114,9 @@ class OMETiffWriter:
         mmap[index] = frame
         mmap.flush()
         if self.advanced_ome:
+            print("METADATA ", event.index)
             self.ome_metadatas[event.index.get("g", 0)].add_plane_from_image(frame, event, meta)
-
-
+        self.writing_frame = False
 
     # -------------------- private --------------------
     def _set_sequence(self, seq: useq.MDASequence | None) -> None:
