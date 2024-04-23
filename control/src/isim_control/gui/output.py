@@ -103,8 +103,6 @@ class OutputGUI(QWidget):
         # The viewer process does not have the right to set a window to the foreground
         Timer(0.5, lambda: ctypes.windll.user32.SetForegroundWindow(self.viewer_id)).start()
 
-
-
     def get_shape(self, settings:dict):
         sequence = useq_from_settings(settings)
         sizes = sequence.sizes

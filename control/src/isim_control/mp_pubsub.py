@@ -102,7 +102,6 @@ def tiff_writer_process(queue, settings, mm_config, in_conn, name):
         del datastore
         writer.sub.stop()
         del writer
-        print("Writer process closing")
 
 
 class RemoteZarrWriter(OMEZarrWriter):
