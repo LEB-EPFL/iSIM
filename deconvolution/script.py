@@ -13,7 +13,7 @@ import cuda_decon
 
 
 """ Set the data to be deconvolved """
-folder = r"Y:/Scientific_projects/MMJ_CEZ/data/iSIM/20240422_IL-2_4d_test_mitotracker_red"
+folder = r"X:/Scientific_projects/MMJ_CEZ/data/iSIM/20240422_IL-2_4d_test_mitotracker_red"
 files = Path(folder).rglob('*.ome.tif*')
 
 """ Settings """
