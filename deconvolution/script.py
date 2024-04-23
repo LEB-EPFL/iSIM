@@ -5,8 +5,8 @@ MY_VERSION="latest"
 #! C:\Internal\.envs\decon_310\Scripts\python.exe
 import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-from versioning import set_version_and_venv, reset_repo
-set_version_and_venv(MY_VERSION)
+# from versioning import set_version_and_venv, reset_repo
+# set_version_and_venv(MY_VERSION)
 from pathlib import Path
 from prepare import get_filter_zone_ver_stripes
 import cuda_decon

@@ -133,17 +133,19 @@ def decon_ome_stack(file_dir, params=None, size_limit=SIZE_LIMIT):
         size_t = int(my_dict['OME']['Image']["Pixels"]["@SizeT"])
         size_z = int(my_dict['OME']['Image']["Pixels"]["@SizeZ"])
         size_c = int(my_dict['OME']['Image']["Pixels"]["@SizeC"])
-        if (Path(file_dir).parents[0] / "isim_settings.yaml").is_file():
-            isim_settings = yaml.load(Path(file_dir).parents[0] / "isim_settings.yaml")
-            z_step = isim_settings['acquisition']
-            print(z_step)
         try:
-            z_step = float(my_dict['OME']['Image']["Pixels"]['@PhysicalSizeZ'])
-            print("Found z step:", z_step)
-        except KeyError:
-            
-            print("Could not get z step size. Will put default 0.2")
-            z_step = 0.2
+            with open(str(Path(file_dir).parents[0] / "isim_settings.yaml")) as stream:
+                isim_settings = yaml.load("\n".join(stream.readlines()[2:]), yaml.Loader)
+                z_step = isim_settings['acquisition']['z_plan']['step']
+                print("Found z step:", z_step)
+        except:
+            try:
+                z_step = float(my_dict['OME']['Image']["Pixels"]['@PhysicalSizeZ'])
+                print("Found z step:", z_step)
+            except KeyError:
+                
+                print("Could not get z step size. Will put default 0.2")
+                z_step = 0.2
         # 'XYCZT' or 'XYZCT' ?
         dim_order = my_dict['OME']['Image']["Pixels"]["@DimensionOrder"]
         data = tif.asarray()
