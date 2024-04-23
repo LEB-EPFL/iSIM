@@ -1,5 +1,5 @@
 """ Set your version or put latest """
-MY_VERSION="20240416_2"
+MY_VERSION="latest"
 
 """ This part should be in all scripts """
 #! C:\Internal\.envs\decon_310\Scripts\python.exe
