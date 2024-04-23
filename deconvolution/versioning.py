@@ -8,9 +8,10 @@ def set_version_and_venv(version: str = "latest", venv: str|None = None):
     sys.path.append(os.path.join(venv, 'lib', 'site-packages'))
 
     MY_VERSION = "main" if version == "latest" else version
-    os.system(f"git config advice.detachedHead false")
-    os.system(f"git stage --all")
-    os.system(f"git commit -m automatic")
+    # This makes problems for a different user
+    # os.system(f"git config advice.detachedHead false")
+    # os.system(f"git stage --all")
+    # os.system(f"git commit -m automatic")
     os.system(f"git checkout {MY_VERSION}")
 
 def reset_repo():
