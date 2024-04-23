@@ -133,7 +133,7 @@ def decon_ome_stack(file_dir, params=None, size_limit=SIZE_LIMIT):
         size_t = int(my_dict['OME']['Image']["Pixels"]["@SizeT"])
         size_z = int(my_dict['OME']['Image']["Pixels"]["@SizeZ"])
         size_c = int(my_dict['OME']['Image']["Pixels"]["@SizeC"])
-        if Path(file_dir.parents[0] / "isim_settings.yaml").is_file():
+        if (Path(file_dir).parents[0] / "isim_settings.yaml").is_file():
             isim_settings = yaml.load(Path(file_dir.parents[0] / "isim_settings.yaml"))
             z_step = isim_settings['acquisition']
             print(z_step)
