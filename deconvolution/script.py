@@ -10,7 +10,7 @@ set_version_and_venv(MY_VERSION)
 from pathlib import Path
 from prepare import get_filter_zone_ver_stripes
 import cuda_decon
-
+os.environ['CUDA_VISIBLE_DEVICES'] = "0"
 
 """ Set the data to be deconvolved """
 folder = r"X:/Scientific_projects/MMJ_CEZ/data/iSIM/20240422_IL-2_4d_test_mitotracker_red"
