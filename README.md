@@ -12,9 +12,9 @@ Switch 2 on
 
  ## Contents
 
- - [control](control) - Prototype of the new iSIM control software
+ - [control](control) - The new and current iSIM control software based on pymmcore-plus
  - [deconvolution](deconvolution/) - iSIM post-processing routines
  - [docs](docs/) - Misc. documentation
- - [gui](gui/) - Current iSIM control software
+ - [gui](gui/) - The previous iSIM control software based on Pycromanager
  - [mm-configs](mm-configs/) - Micro-Manager hardware configurations
  - [mm-plugins](mm-plugins/) - Micro-Manager plugins used by the control software
