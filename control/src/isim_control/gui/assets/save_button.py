@@ -103,7 +103,7 @@ if __name__ == "__main__":
     from qtpy.QtWidgets import QApplication
     from pymmcore_plus import CMMCorePlus
     from useq import MDASequence
-    from pymmcore_widgets._mda._datastore import QOMEZarrDatastore
+    from isim_control.io.datastore import QOMEZarrDatastore
     mmc = CMMCorePlus()
     mmc.loadSystemConfiguration()
 

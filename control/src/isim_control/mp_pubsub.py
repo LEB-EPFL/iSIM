@@ -287,10 +287,7 @@ if __name__ == "__main__":
     #                                         kwargs=
     #                                             {"viewer_queue": viewer_relay.pub_queue})
 
-    # viewer_process = multiprocessing.Process(target=viewer_only_process,
-    #                                     args=([viewer_relay.pub_queue,
-    #                                            viewer_relay.out_conn,
-    #                                            settings['path']]))
+
 
     # writer_process.start()
     # writer_relay.in_conn.recv()
@@ -317,10 +314,6 @@ if __name__ == "__main__":
                                                 mmc.getSystemState().dict(),
                                                 writer_relay.out_conn,
                                                 buffered_datastore._shm.name]))
-    viewer_process = multiprocessing.Process(target=viewer_only_process,
-                                            args=([viewer_relay.pub_queue,
-                                                   viewer_relay.out_conn,
-                                                   buffered_datastore._shm.name]))
 
     writer_process.start()
     viewer_process.start()
