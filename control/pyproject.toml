@@ -15,7 +15,8 @@ dependencies = [
     'pyyaml',
     'nidaqmx',
     'ome-types',
-    'fonticon-materialdesignicons6'
+    'fonticon-materialdesignicons6',
+    'vispy'
 ]
 
 [project.optional-dependencies]
