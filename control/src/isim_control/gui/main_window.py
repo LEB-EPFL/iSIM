@@ -3,8 +3,7 @@ from qtpy.QtWidgets import (QPushButton, QWidget, QGridLayout, QGroupBox,
 from qtpy.QtCore import Qt,QObject, QTimer
 from qtpy import QtGui, QtCore
 
-from pymmcore_widgets import GroupPresetTableWidget, StageWidget
-from pymmcore_widgets._device_property_table import DevicePropertyTable
+from pymmcore_widgets import GroupPresetTableWidget, StageWidget, PropertyBrowser
 from superqt import QLabeledSlider, fonticon
 from isim_control.gui.dark_theme import slider_theme
 
@@ -109,7 +108,7 @@ class MainWindow(QMainWindowRestore):
         self.main.layout().addWidget(self.live_exposure, 3, 2, 1, 2)
 
         self.device_menu = self.menuBar().addMenu("Devices")
-        self.device_prop_table = DevicePropertyTable()
+        self.device_prop_table = PropertyBrowser()
         self.device_menu.addAction("Device Properties").triggered.connect(self._device_properties)
 
         self.main.layout().addWidget(self.channelBox, 0, 1, 4, 1)

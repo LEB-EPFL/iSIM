@@ -26,9 +26,14 @@ def acquisition_settings_from_useq(settings: iSIMSettings, seq: MDASequence):
 def save_settings(settings: iSIMSettings|dict, filename: str = "settings"):
     # The interval in the time_plan settings is a timedelta, which is not JSON serializable
     try:
+        print(settings['acquisition'])
         settings['acquisition'] = serialize_acquisition(settings['acquisition'])
-    except:
-        pass
+        # settings['acquisition'] = settings['acquisition'].model_dump()
+        print(settings['acquisition'])
+
+    except Exception as e:
+        print(e)
+
     path = Path.home() / ".isim" / f"{filename}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as file:
@@ -60,15 +65,19 @@ def load_settings(filename: str = "settings"):
 
 def serialize_acquisition(acquisition: dict):
     """Converts the acquisition dict to a dict that can be serialized to JSON"""
-    try:
-        acquisition['time_plan']['interval'] = acquisition['time_plan']['interval'].seconds
-    except TypeError:
-        pass
+    # try:
+    #     acquisition['time_plan']['interval'] = acquisition['time_plan']['interval'].seconds
+    # except TypeError:
+    #     print("Could not translate interval")
     try:
         acquisition['grid_plan']['mode'] = acquisition['grid_plan']['mode'].name
+    except TypeError:
+        print("Could not translate OderMode")
+    try:
         acquisition['grid_plan']['relative_to'] = acquisition['grid_plan']['relative_to'].name
     except TypeError:
-        pass
+        print("Could not translate relativeto")
+
     return acquisition
 
 def deserialize_acquisition(acquisition: dict):

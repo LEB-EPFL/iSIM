@@ -2,18 +2,55 @@ from pathlib import Path
 import warnings
 
 from qtpy.QtWidgets import  QWidget, QFileDialog
-
-
 from qtpy.QtGui import QCloseEvent
 from pymmcore_plus import CMMCorePlus
 from useq import  MDASequence
-
+import zarr
 
 from isim_control.io.ome_tiff_writer import OMETiffWriter
-from pymmcore_widgets._mda._datastore import QOMEZarrDatastore
-from pymmcore_widgets._mda._util._save_button import SaveButton
+from isim_control.io.datastore import QOMEZarrDatastore
 
-class SaveButton(SaveButton):
+
+from qtpy.QtCore import QSize
+from qtpy.QtGui import QCloseEvent
+from qtpy.QtWidgets import QFileDialog, QPushButton, QWidget
+from superqt import fonticon
+from fonticon_mdi6 import MDI6
+
+
+
+
+class CoreSaveButton(QPushButton):
+    def __init__(
+        self,
+        datastore: QOMEZarrDatastore,
+        parent: QWidget | None = None,
+    ):
+        super().__init__(parent=parent)
+        # self.setFont(QFont('Arial', 50))
+        # self.setMinimumHeight(30)
+        self.setIcon(fonticon.icon(MDI6.content_save_outline, color="gray"))
+        self.setIconSize(QSize(25, 25))
+        self.setFixedSize(30, 30)
+        self.clicked.connect(self._on_click)
+
+        self.datastore = datastore
+        self.save_loc = Path.home()
+
+    def _on_click(self) -> None:
+        self.save_loc, _ = QFileDialog.getSaveFileName(directory=str(self.save_loc))
+        if self.save_loc:
+            self._save_as_zarr(self.save_loc)
+
+    def _save_as_zarr(self, save_loc: str | Path) -> None:
+        dir_store = zarr.DirectoryStore(save_loc)
+        zarr.copy_store(self.datastore._group.attrs.store, dir_store)
+
+    def closeEvent(self, a0: QCloseEvent | None) -> None:
+        super().closeEvent(a0)
+
+
+class SaveButton(CoreSaveButton):
     def __init__(self,
                  datastore:QOMEZarrDatastore,
                  mmcore: CMMCorePlus|None = None,

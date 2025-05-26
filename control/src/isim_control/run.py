@@ -1,44 +1,40 @@
 import copy
 import os
-from isim_control.gui.dark_theme import set_dark
+
+from pymmcore_plus import CMMCorePlus
 from qtpy.QtWidgets import QApplication
 from qtpy.QtCore import Signal
 
+from isim_control.gui.dark_theme import set_dark
 from isim_control.settings_translate import save_settings, load_settings
 from isim_control.pubsub import Publisher, Broker
 from isim_control.runner import iSIMRunner
-
 from isim_control.gui.main_window import iSIM_StageWidget, MainWindow
-from pymmcore_plus import CMMCorePlus
+
 from pymmcore_widgets import StageWidget, GroupPresetTableWidget
 
 import logging
-
+os.environ["PYMM_STRICT_INIT_CHECKS"] = 'true'
+os.environ["PYMM_PARALLEL_INIT"] = 'true'
 
 def main():
-    logger = logging.getLogger(__name__)
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
+    # logger = logging.getLogger(__name__)
+    # ch = logging.StreamHandler()
+    # ch.setLevel(logging.DEBUG)
+    # formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # ch.setFormatter(formatter)
+    # logger.addHandler(ch)
 
-    # def open_audit_hook(name, *args):
-    #     logger.debug(f"Opening {name} with {args}")
-
-    # sys.addaudithook(open_audit_hook)
-
-
-    # os.environ['ZARR_V3_EXPERIMENTAL_API'] = "1"
 
     monogram = False
     app = QApplication([])
+    mmc = CMMCorePlus()
+
+
     set_dark(app)
 
-    broker = Broker()
 
-    mmc = CMMCorePlus.instance()
-    #This is hacky, might just want to make our own preview
+    # This is hacky, might just want to make our own preview
     events_class = mmc.events.__class__
     new_cls = type(
         events_class.__name__, events_class.__bases__,
@@ -49,11 +45,11 @@ def main():
     settings = load_settings()
 
 
-    from isim_control.io.keyboard import KeyboardListener
-    # key_listener = KeyboardListener(mmc=mmc)
-
+    print("Loading system config")
     try:
+
         mmc.loadSystemConfiguration("C:/iSIM/iSIM/mm-configs/pymmcore_plus.cfg")
+        print("System loaded")
         mmc.setCameraDevice("PrimeB_Camera")
         mmc.setProperty("PrimeB_Camera", "TriggerMode", "Edge Trigger")
         mmc.setProperty("PrimeB_Camera", "ReadoutRate", "100MHz 16bit")
@@ -66,6 +62,7 @@ def main():
         mmc.setAutoShutter(False)
 
         #Backend
+        broker = Broker()
         from isim_control.ni import live, acquisition, devices
         isim_devices = devices.NIDeviceGroup(settings=settings)
         from isim_control.io.monogram import MonogramCC
@@ -78,6 +75,7 @@ def main():
         broker.attach(monogram)
         stage = iSIM_StageWidget(mmc)
     except FileNotFoundError:
+        broker = Broker()
         from unittest.mock import MagicMock
         acq_engine = MagicMock()
         live_engine = MagicMock()
@@ -88,7 +86,6 @@ def main():
         mmc.setProperty("Camera", "OnCameraCCDXSize", 2048)
         mmc.setProperty("Camera", "OnCameraCCDYSize", 2048)
         stage = StageWidget("XY", mmcore=mmc)
-
 
     from isim_control.gui.preview import iSIMPreview
     preview = iSIMPreview(mmcore=mmc)
@@ -120,6 +117,7 @@ def main():
     from isim_control.gui import position_history
     history_relay, history_broker, history_process = position_history.main_mp(mmc, output.buffered_datastore)
 
+    from isim_control.io.keyboard import KeyboardListener
     key_listener = KeyboardListener(mmc=mmc)
     app.installEventFilter(key_listener)
 

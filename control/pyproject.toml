@@ -7,20 +7,25 @@ authors = [
 ]
 
 dependencies = [
-    'pymmcore-plus',
-    'pymmcore-widgets',
+    'pymmcore-plus[io]',
+    'pymmcore-widgets[pyqt6]',
     'superqt[cmap]',
     'scipy',
-    'vispy',
     'pygame',
     'pyyaml',
-    'tifffile',
     'nidaqmx',
-    'zarr',
+    'ome-types',
+    'fonticon-materialdesignicons6'
 ]
 
 [project.optional-dependencies]
 display = [ 'vispy' ]
+qt = ['pyqt6']
+full = [ 'vispy', 'pyqt6']
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [tool.coverage.run]
 source = ['isim_control']

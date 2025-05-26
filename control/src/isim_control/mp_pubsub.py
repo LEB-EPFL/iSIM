@@ -14,12 +14,12 @@ from isim_control.settings_translate import useq_from_settings, load_settings
 from isim_control.io.remote_datastore import RemoteDatastore
 from isim_control.io.ome_tiff_writer import OMETiffWriter
 from isim_control.gui.assets.save_button import SaveButton
+from isim_control.gui._stack_viewer import StackViewer
 
 from isim_control.pubsub import Subscriber, Publisher, Broker
 
 from pymmcore_plus import CMMCorePlus
 from pymmcore_plus.mda.handlers import OMEZarrWriter
-from pymmcore_widgets._mda._stack_viewer import StackViewer
 from useq import MDAEvent, MDASequence
 from psygnal import Signal
 
@@ -135,7 +135,7 @@ class RemoteZarrWriter(OMEZarrWriter):
     def get_frame(self, event: MDAEvent) -> np.ndarray:
         key = f'p{event.index.get("p", 0)}'
         try:
-            ary = self._arrays[key]
+            ary = self.position_arrays[key]
         except KeyError:
             return None
         try:

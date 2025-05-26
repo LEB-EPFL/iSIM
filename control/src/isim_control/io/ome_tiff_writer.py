@@ -5,7 +5,7 @@ Should be replaced once this is merged.
 
 from __future__ import annotations
 
-import time
+
 from datetime import timedelta
 from threading import Timer
 from typing import TYPE_CHECKING, Any, cast
@@ -14,13 +14,15 @@ import yaml
 
 from useq import MDAEvent
 from isim_control.io.remote_datastore import RemoteDatastore
+from isim_control.io.datastore import QOMEZarrDatastore
 from isim_control.io.ome_metadata import OME
-from pymmcore_widgets._mda._datastore import QOMEZarrDatastore
 from isim_control.settings_translate import load_settings
 import numpy as np
 
 if TYPE_CHECKING:
     import useq
+
+
 
 
 class OMETiffWriter:

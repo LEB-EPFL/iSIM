@@ -6,7 +6,7 @@ from qtpy import QtCore
 from superqt import fonticon, QRangeSlider
 from useq import MDAEvent
 from fonticon_mdi6 import MDI6
-from tifffile import imsave
+from tifffile import imwrite
 from pathlib import Path
 import numpy as np
 from vispy import scene, visuals
@@ -63,7 +63,7 @@ class iSIMPreview(QWidgetRestore):
             if self.save_loc[-4:] not in [".tif", "tiff"]:
                 self.save_loc += ".tif"
             try:
-                imsave(self.save_loc, self.current_frame)
+                imwrite(self.save_loc, self.current_frame)
             except Exception as e:
                 import traceback
                 print(traceback.format_exc())

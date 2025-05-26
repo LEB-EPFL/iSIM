@@ -1,4 +1,4 @@
-from matplotlib import pyplot as plt
+
 from typing import Protocol
 import numpy as np
 from scipy import ndimage
@@ -16,6 +16,7 @@ class DAQDevice(Protocol):
 
     def plot(self):
         """Plot the daq_data for one frame with matplotlib."""
+        from matplotlib import pyplot as plt
         daq_data = self.one_frame(self.settings)
         x = np.divide(list(range(daq_data.shape[1])),self.settings.final_sample_rate/1000)
         for channel in range(daq_data.shape[0]):
