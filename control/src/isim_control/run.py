@@ -18,12 +18,12 @@ os.environ["PYMM_STRICT_INIT_CHECKS"] = 'true'
 os.environ["PYMM_PARALLEL_INIT"] = 'true'
 
 def main():
-    # logger = logging.getLogger(__name__)
-    # ch = logging.StreamHandler()
-    # ch.setLevel(logging.DEBUG)
-    # formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    # ch.setFormatter(formatter)
-    # logger.addHandler(ch)
+    logger = logging.getLogger(__name__)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
 
 
     monogram = False
@@ -44,6 +44,8 @@ def main():
 
     settings = load_settings()
 
+    from isim_control.io.keyboard import KeyboardListener
+    key_listener = KeyboardListener(mmc=mmc)
 
     print("Loading system config")
     try:
@@ -117,8 +119,7 @@ def main():
     from isim_control.gui import position_history
     history_relay, history_broker, history_process = position_history.main_mp(mmc, output.buffered_datastore)
 
-    from isim_control.io.keyboard import KeyboardListener
-    key_listener = KeyboardListener(mmc=mmc)
+
     app.installEventFilter(key_listener)
 
     stage.show()

@@ -1,4 +1,4 @@
-from threading import Thread
+from threading import Thread, Timer
 import multiprocessing
 import zarr
 import numpy as np
@@ -31,6 +31,7 @@ class Relay(Thread):
         self.out_conn, self.in_conn = multiprocessing.Pipe()
         self.pub = Publisher(self.pub_queue)
         self.settings = None
+        self.xy_device = None
         if subscriber:
             self.sub = Subscriber(["control"],
                               {"set_relative_xy_position": [self._set_relative_xy_position],})
@@ -60,10 +61,26 @@ class Relay(Thread):
         self.pub.publish("sequence", "sequence_finished", [seq])
 
     def XYStagePositionChanged(self, name:str, x: float, y: float) -> None:
+        print("XYSTAGE POSITION changed")
         self.pub.publish("sequence", "xy_stage_position_changed", [name, x, y])
 
     def _set_relative_xy_position(self, device: str, x: float, y: float) -> None:
-        self._mmc.setRelativeXYPosition(device, x, y)
+        self.xy_device = device
+        try:
+            self._mmc.setRelativeXYPosition(device, x, y)
+            # We will hack the emission of the stage position in here, as it is not emitted for
+            # this stage with this MM version unfortunately
+            Timer(0.1, self._emit_XY_Position).start()
+        except:
+            print("Stage not ready")
+
+    def _emit_XY_Position(self):
+        while self._mmc.deviceBusy(self.xy_device):
+            print("waiting for stage")
+            time.sleep(0.005)
+        pos = self._mmc.getXYPosition()
+        self._mmc.events.XYStagePositionChanged.emit(self.xy_device, pos[0], pos[1])
+
 
 
 class RemoteOMETiffWriter(OMETiffWriter):
