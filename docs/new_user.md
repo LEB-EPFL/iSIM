@@ -2,8 +2,10 @@
 
 We are using the EPFL accounts on the setup to allow for personalized settings and window positioning. A set of settings have to be set for every new user before starting the GUI.
 
-
 On login, there will be the Monogram Creator. Set it to the profile in C:/iSIM, in settings make it close to system tray and start minimized
+More detailed:
+File -> Load Profile -> C:\iSIM\iSIM_plus.monogram
+File -> Preferences -> Window -> Select all
 
 More detailed:
 File -> Load Profile -> C:\iSIM\iSIM_plus.monogram
