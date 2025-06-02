@@ -1,6 +1,29 @@
 # iSIM Control based in pymmcore-plus
 This is the 'new' version of the control software for the iSIM microscope. It's based in pymmcore-plus with some custom components to enable the hardware sequenced control for the iSIM. Overall Structure is described in [Overview](./doc/strucutre_overview.md) with more details in [Structure](./doc/structure.md) and [Communications](./doc/output_comms.md).
 
+# Take your first picture
+
+1. Launch the iSIM-Manager on your desktop.
+1. Set EmissionFilter to #NoFilter
+1. Choose the channel under Live Channels
+1. Hit the live 'Live' button
+1. Find the focus (This might be tricky depending on your sample.)
+    ```
+    There are metal inserts available depending on your sample holder.
+    Try to see if one fits your sample. If not, you will have to adjust the screws on the sample stage to get to the correct height (try to ask an experienced user). If nobody is available, be sure to always turn all the screws the same amount (positions on the scerws should be marked to make this easier).
+    ```
+1. Hit the 'Pause' button
+1. Hit the 'Save' button in the bottom of the preview window
+1. Name the file something.tiff (can then be opened in Fiji for example)
+
+## MDA
+1. Hit the MDA button
+1. Set up your acquisition
+   * The intensities below and the twitcher setting will be specific for the acquisition and can be different from your live mode settings
+   * The Filterwheel option should normally not be checked unless in specific situation (e.g. fixed sample with no way to avoid crosstalk)
+   * Save name ideally is something like MyData_000, the number in the end will be counted up automatically for subsequent acquisitions
+1. Hit 'Run'
+
 # Controller
 ![controller functions](../docs/Controller.PNG)
 
