@@ -6,7 +6,7 @@ import weakref
 import matplotlib.pyplot as plt
 from hardware._devices import NIController, DAQSettings, DAQDevice
 from hardware.nidaq_components.settings import NIDAQSettings
-from gui.hardware.nidaq_components.devices import Camera, Galvo, Twitcher, LED, AOTF
+from isimgui.hardware.nidaq_components.devices import Camera, Galvo, Twitcher, LED, AOTF
 
 GALVO_CENTER = -0.075
 TWITCHER_CENTER = 5

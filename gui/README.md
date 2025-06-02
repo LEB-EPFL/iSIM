@@ -32,10 +32,12 @@ Python Control Interface for the iSIM at LEB-EPFL
 
 This repository contains a GUI for aligning the microlenses and pinhole array of the iSIM. It displays regions from a live feed of the illumination spots overlaid with guidelines and spot centers. The goal of the alignment is to bring the centers of the spots to coincide with the guidelines in all regions of the field of view.
 
-To launch the alignment tool, first start Micro-Manager. In the `pymm-eventserver` plugin GUI window, ensure that the `Live Mode Events` checkbox is checked.
+To launch the alignment tool, first start Micro-Manager (config C:\iSIM\Micro-Manager-2.0.2\221130.cfg). In the `pymm-eventserver` plugin GUI window, ensure that the `Live Mode Events` checkbox is checked. Disable Snap/Live for the Pseudo Channels plugin in the On-The-Fly processor pipeline. Close the PositionHistory window that opened up.
+
 
 Next, start the alignment GUI from this directory with the following command:
 
 ```console
+C:\iSIM\isim_python_env\Scripts\activate.ps1
 py main.py alignment
 ```

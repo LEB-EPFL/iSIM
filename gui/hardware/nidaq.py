@@ -15,7 +15,7 @@ from gui.GUIWidgets import SettingsView
 from hardware.FilterFlipper import Flippers
 from alignment import NI
 from hardware.nidaq_components.settings import NIDAQSettings
-from gui.hardware.nidaq_components.devices import Galvo, Camera, Twitcher, LED, AOTF, Stage
+from isimgui.hardware.nidaq_components.devices import Galvo, Camera, Twitcher, LED, AOTF, Stage
 
 class NIDAQ(QObject):
 
@@ -239,7 +239,7 @@ class NIDAQ(QObject):
         for sli in slices:
             channels_data = []
             for channel in self.settings.channels.values():
-                if channel['use']:
+                if channel.get('use', False):
                     aotf = self.aotf.one_frame(self.ni_settings, channel)
                     offset = sli - self.settings.slices[0]
                     stage = self.stage.one_frame(self.ni_settings, offset)
