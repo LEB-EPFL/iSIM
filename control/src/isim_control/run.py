@@ -1,17 +1,17 @@
 import copy
 import os
 
-from pymmcore_plus import CMMCorePlus
+from pymmcore_widgets import StageWidget, GroupPresetTableWidget
 from qtpy.QtWidgets import QApplication
-from qtpy.QtCore import Signal
+from qtpy.QtCore import Signal, Qt
 
+from isim_control.core import ISIMCore
 from isim_control.gui.dark_theme import set_dark
 from isim_control.settings_translate import save_settings, load_settings
 from isim_control.pubsub import Publisher, Broker
 from isim_control.runner import iSIMRunner
 from isim_control.gui.main_window import iSIM_StageWidget, MainWindow
 
-from pymmcore_widgets import StageWidget, GroupPresetTableWidget
 
 import logging
 os.environ["PYMM_STRICT_INIT_CHECKS"] = 'true'
@@ -28,13 +28,13 @@ def main():
 
     monogram = False
     app = QApplication([])
-    mmc = CMMCorePlus()
+    mmc = ISIMCore.instance()
 
 
     set_dark(app)
 
 
-    # This is hacky, might just want to make our own preview
+    #This is hacky, might just want to make our own preview
     events_class = mmc.events.__class__
     new_cls = type(
         events_class.__name__, events_class.__bases__,
@@ -44,8 +44,7 @@ def main():
 
     settings = load_settings()
 
-    from isim_control.io.keyboard import KeyboardListener
-    key_listener = KeyboardListener(mmc=mmc)
+
 
     print("Loading system config")
     try:
@@ -89,6 +88,9 @@ def main():
         mmc.setProperty("Camera", "OnCameraCCDYSize", 2048)
         stage = StageWidget("XY", mmcore=mmc)
 
+    from isim_control.io.keyboard import KeyboardListener
+    key_listener = KeyboardListener(mmc=mmc)
+
     from isim_control.gui.preview import iSIMPreview
     preview = iSIMPreview(mmcore=mmc)
 
@@ -111,6 +113,9 @@ def main():
     group_presets = GroupPresetTableWidget(mmcore=mmc)
     frame.main.layout().addWidget(group_presets, 5, 0, 1, 3)
     frame.group_presets = group_presets
+    row = group_presets.table_wdg.findItems("Channel",
+                                            Qt.MatchFlag.MatchExactly)[0].row()
+    group_presets.table_wdg.cellWidget(row,1).setDisabled(True)
     group_presets.show() # needed to keep events alive?
 
     from isim_control.gui.output import OutputGUI

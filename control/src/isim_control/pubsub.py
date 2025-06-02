@@ -13,7 +13,7 @@ class Broker(Thread):
         if auto_start:
             self.start()
 
-    def attach(self,subscriber: Subscriber):
+    def attach(self, subscriber: Subscriber):
         self.subscribers.add(subscriber)
 
     def route(self, topic, message: str, values: list):

@@ -83,11 +83,13 @@ class iSIMRunner:
         self.live_engine.snap()
 
     def _property_changed(self, device, prop, value):
-        if device != "DStateDevice":
+        if device != "DWheel":
             self._restart_live(device, prop)
             return
-        if prop == "Label":
-            self.pub.publish("gui", "channel_activated", [value.lower()])
+        if prop == "State":
+            values = {0: "488", 1: "561", 2: "LED"}
+            print(value)
+            self.pub.publish("gui", "channel_activated", [values[value]])
 
     def _restart_live(self, device, *_):
         """Once a second restart live if property has changed"""

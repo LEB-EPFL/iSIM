@@ -186,8 +186,8 @@ class MainWindow(QMainWindowRestore):
         if self.group_presets and toggle:
             row = self.group_presets.table_wdg.findItems("Channel",
                                                          QtCore.Qt.MatchFlag.MatchExactly)[0].row()
-            self.group_presets.table_wdg.cellWidget(row,1)._on_core_change("DStateDevice",
-                                                                           "Label", "488")
+            print(self.group_presets.table_wdg.cellWidget(row,1))
+            self.group_presets.table_wdg.cellWidget(row,1).setValue("488")
 
     def _488_value_changed(self, value):
         self.settings['live']['ni']['laser_powers']['488'] = value
@@ -204,8 +204,7 @@ class MainWindow(QMainWindowRestore):
         if self.group_presets and toggle:
             row = self.group_presets.table_wdg.findItems("Channel",
                                                          QtCore.Qt.MatchFlag.MatchExactly)[0].row()
-            self.group_presets.table_wdg.cellWidget(row,1)._on_core_change("DStateDevice",
-                                                                           "Label", "561")
+            self.group_presets.table_wdg.cellWidget(row,1).setValue("561")
 
     def _561_value_changed(self, value):
         self.settings['live']['ni']['laser_powers']['561'] = value
@@ -222,8 +221,7 @@ class MainWindow(QMainWindowRestore):
         if self.group_presets and toggle:
             row = self.group_presets.table_wdg.findItems("Channel",
                                                          QtCore.Qt.MatchFlag.MatchExactly)[0].row()
-            self.group_presets.table_wdg.cellWidget(row,1)._on_core_change("DStateDevice",
-                                                                           "Label", "LED")
+            self.group_presets.table_wdg.cellWidget(row,1).setValue("LED")
 
     def _led_value_changed(self, value):
         self.settings['live']['ni']['laser_powers']['led'] = value
