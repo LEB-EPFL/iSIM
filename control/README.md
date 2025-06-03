@@ -18,7 +18,7 @@ This is the 'new' version of the control software for the iSIM microscope. It's 
 1. Hit the MDA button
 1. Set up your acquisition
    * The intensities below and the twitcher setting will be specific for the acquisition and can be different from your live mode settings
-   * The Filterwheel option should normally not be checked unless in specific situation (e.g. fixed sample with no way to avoid crosstalk)
+   * The Filterwheel option should normally not be checked unless in specific situations (e.g. fixed sample with no way to avoid crosstalk)
    * Save name ideally is something like MyData_000, the number in the end will be counted up automatically for subsequent acquisitions
 1. Hit 'Run'
 
@@ -57,6 +57,10 @@ C:\Users\~you~\.isim
 To change the orientation of the image to match your preference for how the stage should work go to:
 C:\Users\your_account\.isim\live_view.json
 and adjust the settings there.
+
+# Sample holder
+The design for the sample folder is here [Fusion360](https://a360.co/3FxlTVk), [docs/all_holder.stl](../docs/all_holder.stl) and [docs/all_holder.stp](../docs/all_holder.stp)
+
 
 # Alignment
 The alignment procedure has to be used from the old software [Alignment](../gui/README.md#alignment)
