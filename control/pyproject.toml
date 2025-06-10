@@ -16,7 +16,8 @@ dependencies = [
     'nidaqmx',
     'ome-types',
     'fonticon-materialdesignicons6',
-    'vispy'
+    'vispy',
+    "pymmcore-eda",
 ]
 
 [project.optional-dependencies]
@@ -30,3 +31,6 @@ build-backend = "hatchling.build"
 
 [tool.coverage.run]
 source = ['isim_control']
+
+[tool.uv.sources]
+pymmcore-eda = { path = "../../pymmcore-eda", editable = true }
