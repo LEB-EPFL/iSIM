@@ -42,9 +42,9 @@ This is the 'new' version of the control software for the iSIM microscope. It's 
     mmcore install -d C:\isim
     mmcore use C:\iSIM\Micro-Manager_2.0.3_20250523 #replace with used version
     ```
-    >You can use this to install a certain version (20250523 works when this is written)  
+    >You can use this to install a certain version (20250523 works when this is written)
     `-r, --release TEXT    Release date. e.g. 20210201  \[default: latest-compatible]`
-    
+
 1. Make a shortcut to run C:\iSIM\iSIM\control\main.ps1
 1. For each user follow [add new user](../docs/new_user.md)
 
@@ -64,3 +64,6 @@ The design for the sample folder is here [Fusion360](https://a360.co/3FxlTVk), [
 
 # Alignment
 The alignment procedure has to be used from the old software [Alignment](../gui/README.md#alignment)
+
+# EDA
+The system is set up to perform eda acquisition based on [pymmcore-eda](https://github.com/LEB-EPFL/pymmcore-eda). Example files [with](./src/isim_control/eda/basic.py) and [without](./src/isim_control/eda/gui.py) a preview window can be found in the [eda](./src/isim_control/eda) folder. More examples on how to do more complex EDA acquisitions and how to 'close the loop' can be found in the pymmcore-eda repository.

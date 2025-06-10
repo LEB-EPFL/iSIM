@@ -66,12 +66,12 @@ def main():
         broker = Broker()
         from isim_control.ni import live, acquisition, devices
         isim_devices = devices.NIDeviceGroup(settings=settings)
-        from isim_control.io.monogram import MonogramCC
         acq_engine = acquisition.AcquisitionEngine(mmc, isim_devices, settings)
         live_engine = live.LiveEngine(task=acq_engine.task, mmcore=mmc, settings=settings,
                                         device_group=isim_devices)
         mmc.mda.set_engine(acq_engine)
 
+        from isim_control.io.monogram import MonogramCC
         monogram = MonogramCC(mmcore=mmc, publisher=Publisher(broker.pub_queue))
         broker.attach(monogram)
         stage = iSIM_StageWidget(mmc)
