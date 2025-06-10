@@ -5,7 +5,7 @@ from isim_control.settings import iSIMSettings
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pymmcore_plus import CMMCorePlus
-    from useq import MDASequence
+from useq import MDASequence
 import json
 from pathlib import Path
 from datetime import timedelta
