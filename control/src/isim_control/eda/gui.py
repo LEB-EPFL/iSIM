@@ -1,19 +1,19 @@
-import os
-
-from qtpy.QtWidgets import QApplication
-from qtpy.QtCore import Signal
-
 from isim_control.core import ISIMCore
 from useq import MDASequence
 from pymmcore_eda.actuator import MDAActuator, ButtonActuator
 from pymmcore_eda.queue_manager import QueueManager
+
+from qtpy.QtWidgets import QApplication
+from qtpy.QtCore import Signal, Qt
+
 from isim_control.settings_translate import load_settings
 
-os.environ["PYMM_STRICT_INIT_CHECKS"] = 'true'
-os.environ["PYMM_PARALLEL_INIT"] = 'true'
-def main():
+import threading
+
+
+if __name__ == "__main__":
     app = QApplication([])
-    mmc = ISIMCore.instance()
+    mmc = ISIMCore()
     settings = load_settings()
     settings['twitchers'] = False
     settings['exposure_time'] = 0.05
@@ -54,34 +54,36 @@ def main():
     isim_devices.update_settings(settings)
     mmc.mda.set_engine(acq_engine)
 
-    from pymmcore_eda.writer import AdaptiveWriter
-    from pathlib import Path
-    loc = Path("C:/Users/stepp/Desktop/MyOME.ome.zarr")
-    writer = AdaptiveWriter(path=loc, delete_existing=True)
-    from pymmcore_eda.event_hub import EventHub
-    EventHub(mmc.mda, writer)
+    # GUI things
+    from isim_control.pubsub import Publisher, Broker
+    broker = Broker()
+    pub = Publisher(broker.pub_queue)
+
+    from isim_control.gui.output import OutputGUI
+    output = OutputGUI(mmc, settings, broker, Publisher(broker.pub_queue))
+    output.show()
+
+    print(settings['path'])
     # EDA components
     queue_manager = QueueManager(mmcore=mmc)
 
     mda_sequence = MDASequence(
         channels=["488"],
-        time_plan={"interval": 0.5, "loops": 10},
+        time_plan={"interval": 0.5, "loops": 60},
     )
     base_actuator = MDAActuator(queue_manager, mda_sequence)
     base_actuator.wait = False
 
     b_actuator = ButtonActuator(queue_manager)
-    b_actuator.channel_name = "561"
+    b_actuator.channel_name = "LED"
 
-
-    mmc.run_mda(queue_manager.acq_queue_iterator, output=writer)
+    pub.publish("gui", "acquisition_start", [True])
+    mmc.run_mda(queue_manager.acq_queue_iterator)
 
     base_actuator.thread.start()
     b_actuator.thread.start()
     app.exec_()
-    base_actuator.thread.join()
-    b_actuator.thread.join()
 
-
-if __name__ == "__main__":
-    main()
+    print("Shut down")
+    output.shutdown()
+    broker.stop()
