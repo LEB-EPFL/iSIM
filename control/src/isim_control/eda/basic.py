@@ -1,9 +1,12 @@
 import os
+import copy
 
-from qtpy.QtWidgets import QApplication
-from qtpy.QtCore import Signal
+from pymmcore_widgets import StageWidget, GroupPresetTableWidget
+from qtpy.QtWidgets import QApplication, QWidget
+from qtpy.QtCore import Signal, Qt
 
 from isim_control.core import ISIMCore
+
 from useq import MDASequence
 from pymmcore_eda.actuator import MDAActuator, ButtonActuator
 from pymmcore_eda.queue_manager import QueueManager
@@ -11,6 +14,7 @@ from isim_control.settings_translate import load_settings
 
 os.environ["PYMM_STRICT_INIT_CHECKS"] = 'true'
 os.environ["PYMM_PARALLEL_INIT"] = 'true'
+
 def main():
     app = QApplication([])
     mmc = ISIMCore.instance()
@@ -58,6 +62,9 @@ def main():
     from pathlib import Path
     loc = Path("C:/Users/stepp/Desktop/MyOME.ome.zarr")
     writer = AdaptiveWriter(path=loc, delete_existing=True)
+    mmc.mda.events.sequenceStarted.connect(writer.sequenceStarted)
+    mmc.mda.events.sequenceFinished.connect(writer.sequenceFinished)
+    mmc.mda.events.frameReady.connect(writer.frameReady)
     from pymmcore_eda.event_hub import EventHub
     EventHub(mmc.mda, writer)
     # EDA components
@@ -71,10 +78,11 @@ def main():
     base_actuator.wait = False
 
     b_actuator = ButtonActuator(queue_manager)
-    b_actuator.channel_name = "561"
+    b_actuator.channel_name = "LED"
+    wid = QWidget()
+    wid.show()
 
-
-    mmc.run_mda(queue_manager.acq_queue_iterator, output=writer)
+    mmc.run_mda(queue_manager.acq_queue_iterator)
 
     base_actuator.thread.start()
     b_actuator.thread.start()
