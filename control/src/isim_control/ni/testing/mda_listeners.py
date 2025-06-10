@@ -19,7 +19,6 @@ class MyProcessor(QtWidgets.QWidget):
     # grab info about the full experiment at the beginning
 
     def frameReady(self, frame, event):
-        print("FRAME READY")
         # if not using the sequenceStarted method
         if event.sequence:
             # grab info from event.sequence
