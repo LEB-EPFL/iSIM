@@ -22,6 +22,7 @@ class AcquisitionEngine(MDAEngine):
         self.settings = settings or iSIMSettings()
         self.device_group = device_group
         self.previous_exposure = None
+        self.eda = False
 
         self.task = self.device_group.task
         self.stream = self.device_group.stream
@@ -57,7 +58,7 @@ class AcquisitionEngine(MDAEngine):
             pass
         self.stream.write_many_sample(self.ni_data)
         # Delay the first frame a little so that things have time to set up
-        if sum(sub_event.index.values()) == 0:
+        if sum(sub_event.index.values()) == 0 and not self.eda:
             #Offset the time we needed to set up the acqusition in the runner
             self.mmc._mda_runner._paused_time +=time.perf_counter() - t0
             time.sleep(WAIT_TIME)
@@ -92,7 +93,11 @@ class AcquisitionEngine(MDAEngine):
         self.sequence = copy.deepcopy(sequence)
         # This we will use to know about the next event (setting z_position for example)
         self.internal_event_iterator = self.sequence.iter_events()
-        next(self.internal_event_iterator)
+        try:
+            next(self.internal_event_iterator)
+        except StopIteration:
+            # Might be EDA for example, not possible to get the next event
+            pass
         self._mmc.setPosition(min(self.settings['ni']['relative_z'], 202))
         self.use_filter_wheel = self.settings['use_filters']
         if self.use_filter_wheel:
