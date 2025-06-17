@@ -264,7 +264,7 @@ requires-dist = [
     { name = "nidaqmx" },
     { name = "ome-types" },
     { name = "pygame" },
-    { name = "pymmcore-eda", editable = "../../pymmcore-eda" },
+    { name = "pymmcore-eda", git = "https://github.com/LEB-EPFL/pymmcore-eda.git?rev=v0.1.1" },
     { name = "pymmcore-plus", extras = ["io"] },
     { name = "pymmcore-widgets", extras = ["pyqt6"] },
     { name = "pyqt6", marker = "extra == 'full'" },
@@ -709,24 +709,12 @@ wheels = [
 
 [[package]]
 name = "pymmcore-eda"
-source = { editable = "../../pymmcore-eda" }
+version = "0.1.1"
+source = { git = "https://github.com/LEB-EPFL/pymmcore-eda.git?rev=v0.1.1#ec7be48ab4d076620eec191c7c33fbd12683e4cc" }
 dependencies = [
     { name = "pymmcore-plus" },
     { name = "sortedcontainers" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "ipython", marker = "extra == 'dev'" },
-    { name = "mypy", marker = "extra == 'dev'" },
-    { name = "pdbpp", marker = "sys_platform != 'win32' and extra == 'dev'" },
-    { name = "pre-commit", marker = "extra == 'dev'" },
-    { name = "pymmcore-plus" },
-    { name = "ruff", marker = "extra == 'dev'" },
-    { name = "sortedcontainers", specifier = ">=2.4.0" },
-    { name = "tensorstore-stubs", marker = "extra == 'dev'" },
-]
-provides-extras = ["dev"]
 
 [[package]]
 name = "pymmcore-plus"

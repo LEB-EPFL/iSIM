@@ -95,7 +95,7 @@ def main():
 
     mda_sequence = MDASequence(
         channels=[CHANNELS[0]],
-        time_plan={"interval": 0.5, "loops": 10},
+        time_plan={"interval": 1, "loops": 30},
     )
     base_actuator = MDAActuator(queue_manager, mda_sequence)
     base_actuator.wait = False
