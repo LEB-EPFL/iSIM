@@ -44,6 +44,7 @@ class OMETiffWriter:
         self._view_settings = load_settings("live_view")
         # create an empty OME-TIFF file
         self._folder = Path(folder)
+        print(self._folder)
         self._settings = settings
         self._mm_config = mm_config
         self.advanced_ome = advanced_ome

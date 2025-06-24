@@ -33,4 +33,4 @@ build-backend = "hatchling.build"
 source = ['isim_control']
 
 [tool.uv.sources]
-pymmcore-eda = { path = "../../pymmcore-eda", editable = true }
+pymmcore-eda = { git = "https://github.com/LEB-EPFL/pymmcore-eda.git", rev = "v0.1.1" }
