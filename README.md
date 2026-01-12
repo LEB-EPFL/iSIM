@@ -2,6 +2,10 @@
 
  iSIM control and analysis software 
 
+ ## Documentation and Troubleshooting
+
+ Please check the Wiki for documentation and test procedures: <https://github.com/LEB-EPFL/iSIM/wiki>
+
  ## Contents
 
  - [control](control) - The new and current iSIM control software based on pymmcore-plus
