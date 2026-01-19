@@ -3,7 +3,7 @@ from gui.GUIWidgets import SettingsView
 import sys
 from PyQt5 import QtWidgets
 from pymm_eventserver.event_thread import EventThread
-from isimgui.gui.MainGUI import MainGUI
+from gui.MainGUI import MainGUI
 from hardware.nidaq import NIDAQ
 
 

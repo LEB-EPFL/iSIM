@@ -1,5 +1,5 @@
-from isimgui.hardware._devices import DAQDevice
-from isimgui.hardware.nidaq_components.settings import NIDAQSettings
+from hardware._devices import DAQDevice
+from hardware.nidaq_components.settings import NIDAQSettings
 import numpy as np
 from scipy import ndimage
 import matplotlib.pyplot as plt

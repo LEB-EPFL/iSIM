@@ -15,7 +15,7 @@ from gui.GUIWidgets import SettingsView
 from hardware.FilterFlipper import Flippers
 from alignment import NI
 from hardware.nidaq_components.settings import NIDAQSettings
-from isimgui.hardware.nidaq_components.devices import Galvo, Camera, Twitcher, LED, AOTF, Stage
+from hardware.nidaq_components.devices import Galvo, Camera, Twitcher, LED, AOTF, Stage
 
 class NIDAQ(QObject):
 
